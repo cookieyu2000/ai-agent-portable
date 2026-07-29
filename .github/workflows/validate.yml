@@ -1,0 +1,28 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Show runtime versions
+        run: |
+          bash --version | head -1
+          python3 --version
+          rg --version | head -1
+
+      - name: Run validation suite
+        run: ./tests/run_all.sh

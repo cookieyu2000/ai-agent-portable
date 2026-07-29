@@ -1,8 +1,15 @@
 # AI Agent Portable
 
+[![Validate](https://github.com/cookieyu2000/ai-agent-portable/actions/workflows/validate.yml/badge.svg)](https://github.com/cookieyu2000/ai-agent-portable/actions/workflows/validate.yml)
+
 將目前使用的 Codex 與 Claude Code skills／plugins 以可重建方式保存。這個
 repository 不保存 plugin cache 或登入憑證；新裝置透過來源 manifest 重新安裝，
 connector 則重新授權。
+
+目前兩個 agent 的共同基線是
+[26 個 skills](./manifests/common-skills.txt)：24 個 `agent-skills`、`i-have-adhd`
+與 `karpathy-guidelines`。Codex 的 GitHub、Hugging Face 與內建 skills 維持為
+Codex 專用，不會假裝成 Claude 可用的 skill。
 
 ## 新裝置安裝
 
@@ -61,6 +68,7 @@ Claude Code：
 
 - `agent-skills@addy-agent-skills`
 - `i-have-adhd@i-have-adhd`
+- `karpathy-guidelines`：從此 repository 複製至 `~/.claude/skills/`。
 
 需要人工處理：
 
@@ -83,3 +91,41 @@ claude plugin list
 ```
 
 Codex 使用 `$i-have-adhd`；Claude Code 使用 `/i-have-adhd`。
+
+## 查看 Skill Inventory
+
+在 terminal 合併顯示 Codex 與 Claude 的 skill 數量、平台、來源與用途：
+
+```bash
+./list-skills.sh
+```
+
+只看單一平台：
+
+```bash
+./list-skills.sh --platform codex
+./list-skills.sh --platform claude
+```
+
+合併輸出 JSON：
+
+```bash
+./list-skills.sh --platform both --format json
+```
+
+重新產生 GitHub 可讀的 [SKILLS.md](./SKILLS.md)：
+
+```bash
+./list-skills.sh --platform both --format markdown --output SKILLS.md
+```
+
+這是 filesystem inventory，可能包含 plugin cache 或 internal skills，不代表每個
+agent session 都會公開完全相同的清單。相同名稱會合併，`Platform` 欄位會標示
+它目前出現在 `codex`、`claude` 或兩者。Claude plugin 的 `.claude/commands`
+也會納入統計，因為 Claude 將這些 command components 顯示為 skills。
+
+執行所有測試：
+
+```bash
+./tests/run_all.sh
+```

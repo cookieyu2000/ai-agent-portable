@@ -14,12 +14,18 @@ check_file() {
 }
 
 check_file README.md
+check_file SKILLS.md
+check_file .github/workflows/validate.yml
+check_file list-skills.sh
 check_file manifests/sources.tsv
 check_file manifests/agent-skills.txt
+check_file manifests/common-skills.txt
 check_file manifests/codex-plugins.txt
 check_file manifests/claude-plugins.txt
 check_file skills/karpathy-guidelines/SKILL.md
 check_file scripts/bootstrap.sh
+check_file scripts/skill_inventory.py
+check_file tests/test_skill_inventory.py
 
 while IFS=$'\t' read -r name url commit destination; do
     [[ "${name}" == \#* || -z "${name}" ]] && continue
@@ -45,6 +51,34 @@ else
     errors=$((errors + 1))
 fi
 
+common_skill_count="$(
+    grep -c '^[a-z]' "${BUNDLE_ROOT}/manifests/common-skills.txt"
+)"
+if [[ "${common_skill_count}" -eq 26 ]]; then
+    printf 'ok: common Codex/Claude baseline (%s)\n' "${common_skill_count}"
+else
+    printf 'unexpected common skill count: %s\n' "${common_skill_count}" >&2
+    errors=$((errors + 1))
+fi
+
+while IFS= read -r skill_name; do
+    [[ -n "${skill_name}" ]] || continue
+    if ! grep -Fx "${skill_name}" \
+        "${BUNDLE_ROOT}/manifests/common-skills.txt" >/dev/null; then
+        printf 'common baseline is missing agent skill: %s\n' "${skill_name}" >&2
+        errors=$((errors + 1))
+    fi
+done <"${BUNDLE_ROOT}/manifests/agent-skills.txt"
+
+for skill_name in karpathy-guidelines i-have-adhd; do
+    if ! grep -Fx "${skill_name}" \
+        "${BUNDLE_ROOT}/manifests/common-skills.txt" >/dev/null; then
+        printf 'common baseline is missing portable skill: %s\n' \
+            "${skill_name}" >&2
+        errors=$((errors + 1))
+    fi
+done
+
 if rg -n -i \
     '(api[_-]?key|access[_-]?token|refresh[_-]?token|password|private[_-]?key)[[:space:]]*[:=][[:space:]]*[^<${]' \
     "${BUNDLE_ROOT}" \
@@ -62,4 +96,3 @@ if [[ "${errors}" -ne 0 ]]; then
 fi
 
 printf 'verification passed\n'
-

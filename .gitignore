@@ -1,8 +1,10 @@
 .env
 .env.*
+__pycache__/
+*.py[cod]
+.vscode/
 *.key
 *.pem
 credentials*
 secrets*
 .DS_Store
-

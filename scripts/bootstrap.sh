@@ -90,8 +90,9 @@ ensure_symlink() {
 
 install_bundled_skill() {
     local skill_name="$1"
+    local config_root="$2"
     local source_path="${BUNDLE_ROOT}/skills/${skill_name}"
-    local destination_path="${CODEX_CONFIG_ROOT}/skills/${skill_name}"
+    local destination_path="${config_root}/skills/${skill_name}"
 
     if [[ -d "${destination_path}" && ! -L "${destination_path}" ]]; then
         if diff -qr "${source_path}" "${destination_path}" >/dev/null; then
@@ -103,13 +104,13 @@ install_bundled_skill() {
 
     [[ ! -L "${destination_path}" ]] ||
         fail "symbolic link already exists at bundled skill destination: ${destination_path}"
-    run mkdir -p "${CODEX_CONFIG_ROOT}/skills"
+    run mkdir -p "${config_root}/skills"
     run cp -R "${source_path}" "${destination_path}"
 }
 
 codex_plugin_installed() {
     codex plugin list --json 2>/dev/null |
-        grep -Fq "\"pluginId\": \"$1\""
+        grep -F "\"pluginId\": \"$1\"" >/dev/null
 }
 
 ensure_codex_plugin() {
@@ -127,7 +128,7 @@ ensure_codex_plugin() {
 
 codex_marketplace_installed() {
     codex plugin marketplace list --json 2>/dev/null |
-        grep -Fq "\"name\": \"$1\""
+        grep -F "\"name\": \"$1\"" >/dev/null
 }
 
 ensure_codex_marketplace() {
@@ -145,7 +146,7 @@ ensure_codex_marketplace() {
 }
 
 claude_plugin_installed() {
-    claude plugin list 2>/dev/null | grep -Fq "$1"
+    claude plugin list 2>/dev/null | grep -F "$1" >/dev/null
 }
 
 ensure_claude_plugin() {
@@ -155,14 +156,14 @@ ensure_claude_plugin() {
         return
     fi
     if claude_plugin_installed "${plugin_id}"; then
-        log "ok: Claude plugin already installed: ${plugin_id}"
+        run claude plugin update "${plugin_id}" --scope user
         return
     fi
     run claude plugin install "${plugin_id}" --scope user
 }
 
 claude_marketplace_installed() {
-    claude plugin marketplace list 2>/dev/null | grep -Fq "$1"
+    claude plugin marketplace list 2>/dev/null | grep -F "$1" >/dev/null
 }
 
 ensure_claude_marketplace() {
@@ -194,7 +195,7 @@ install_codex() {
             "${CODEX_CONFIG_ROOT}/skills/${skill_name}"
     done <"${BUNDLE_ROOT}/manifests/agent-skills.txt"
 
-    install_bundled_skill karpathy-guidelines
+    install_bundled_skill karpathy-guidelines "${CODEX_CONFIG_ROOT}"
     ensure_codex_plugin github@openai-curated
     ensure_codex_plugin hugging-face@openai-curated
     ensure_codex_marketplace i-have-adhd "${adhd_path}"
@@ -213,6 +214,7 @@ install_claude() {
     ensure_claude_plugin agent-skills@addy-agent-skills
     ensure_claude_marketplace i-have-adhd "${adhd_path}"
     ensure_claude_plugin i-have-adhd@i-have-adhd
+    install_bundled_skill karpathy-guidelines "${CLAUDE_CONFIG_ROOT}"
 }
 
 while [[ $# -gt 0 ]]; do

@@ -1,0 +1,4 @@
+# plugin_id	observed_version	source
+agent-skills@addy-agent-skills	a5f0b176381e	https://github.com/addyosmani/agent-skills.git
+i-have-adhd@i-have-adhd	0.1.0	https://github.com/ayghri/i-have-adhd.git
+

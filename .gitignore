@@ -1,0 +1,8 @@
+.env
+.env.*
+*.key
+*.pem
+credentials*
+secrets*
+.DS_Store
+

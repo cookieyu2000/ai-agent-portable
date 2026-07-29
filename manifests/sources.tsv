@@ -1,0 +1,4 @@
+# name	url	commit	destination
+agent-skills	https://github.com/addyosmani/agent-skills.git	a5f0b176381e9fea24a61aefc243506686aa2435	agent-skills
+i-have-adhd	https://github.com/ayghri/i-have-adhd.git	07684c4ab625dd7d1ea6e99e065f60bc0ac6a1ba	i-have-adhd
+

@@ -1,0 +1,5 @@
+# plugin_id	observed_version	source
+github@openai-curated	11c74d6b	openai-curated
+hugging-face@openai-curated	11c74d6b	openai-curated
+i-have-adhd@i-have-adhd	0.1.0	https://github.com/ayghri/i-have-adhd.git
+

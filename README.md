@@ -9,7 +9,7 @@ connector 則重新授權。
 先安裝 `git`、Codex CLI 與 Claude Code，再 clone 此 repository。
 
 ```bash
-git clone <YOUR_PRIVATE_REPOSITORY_URL> ai-agent-portable
+git clone https://github.com/cookieyu2000/ai-agent-portable.git
 cd ai-agent-portable
 ```
 

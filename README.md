@@ -66,7 +66,8 @@ Codex：
 
 Claude Code：
 
-- `agent-skills@addy-agent-skills`
+- `agent-skills@portable-agent-skills`：使用已 pin 的本機 checkout，避免再次
+ 透過 SSH 或 HTTPS clone。
 - `i-have-adhd@i-have-adhd`
 - `karpathy-guidelines`：從此 repository 複製至 `~/.claude/skills/`。
 

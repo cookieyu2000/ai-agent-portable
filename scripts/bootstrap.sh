@@ -180,6 +180,51 @@ ensure_claude_marketplace() {
     run claude plugin marketplace add "${marketplace_source}"
 }
 
+prepare_portable_claude_marketplace() {
+    local agent_skills_path="$1"
+    local output_variable="$2"
+    local marketplace_root
+    local manifest_source
+    local manifest_destination
+
+    marketplace_root="${SOURCE_ROOT}/claude-marketplaces/portable-agent-skills"
+    manifest_source="${BUNDLE_ROOT}/claude-marketplaces/portable-agent-skills/.claude-plugin/marketplace.json"
+    manifest_destination="${marketplace_root}/.claude-plugin/marketplace.json"
+
+    if [[ -f "${manifest_destination}" ]]; then
+        diff -q "${manifest_source}" "${manifest_destination}" >/dev/null ||
+            fail "different marketplace manifest already exists: ${manifest_destination}"
+        log "ok: portable Claude marketplace manifest already installed"
+    else
+        [[ ! -e "${manifest_destination}" ]] ||
+            fail "marketplace manifest path is not a regular file: ${manifest_destination}"
+        run mkdir -p "${marketplace_root}/.claude-plugin"
+        run cp "${manifest_source}" "${manifest_destination}"
+    fi
+
+    ensure_symlink \
+        "${agent_skills_path}" \
+        "${marketplace_root}/agent-skills"
+    printf -v "${output_variable}" '%s' "${marketplace_root}"
+}
+
+ensure_claude_agent_skills() {
+    local agent_skills_path="$1"
+    local marketplace_path
+
+    if [[ "${MODE}" == "apply" ]] &&
+        claude_plugin_installed agent-skills@addy-agent-skills; then
+        log "ok: compatible legacy Claude plugin already installed: agent-skills@addy-agent-skills"
+        return
+    fi
+
+    prepare_portable_claude_marketplace \
+        "${agent_skills_path}" \
+        marketplace_path
+    ensure_claude_marketplace portable-agent-skills "${marketplace_path}"
+    ensure_claude_plugin agent-skills@portable-agent-skills
+}
+
 install_codex() {
     local agent_skills_path adhd_path skill_name
     require_command codex
@@ -210,8 +255,7 @@ install_claude() {
     ensure_repo agent-skills agent_skills_path
     ensure_repo i-have-adhd adhd_path
 
-    ensure_claude_marketplace addy-agent-skills "${agent_skills_path}"
-    ensure_claude_plugin agent-skills@addy-agent-skills
+    ensure_claude_agent_skills "${agent_skills_path}"
     ensure_claude_marketplace i-have-adhd "${adhd_path}"
     ensure_claude_plugin i-have-adhd@i-have-adhd
     install_bundled_skill karpathy-guidelines "${CLAUDE_CONFIG_ROOT}"

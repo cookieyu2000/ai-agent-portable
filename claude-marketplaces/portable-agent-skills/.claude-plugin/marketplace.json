@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "portable-agent-skills",
+  "description": "Local pinned agent-skills marketplace for portable installs.",
+  "owner": {
+    "name": "AI Agent Portable"
+  },
+  "plugins": [
+    {
+      "name": "agent-skills",
+      "source": "./agent-skills",
+      "version": "7829ffd90d97",
+      "description": "Production-grade engineering skills covering the software development lifecycle.",
+      "homepage": "https://github.com/addyosmani/agent-skills",
+      "license": "MIT"
+    }
+  ]
+}

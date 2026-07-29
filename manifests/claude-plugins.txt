@@ -1,3 +1,3 @@
 # plugin_id	observed_version	source
-agent-skills@addy-agent-skills	7829ffd90d97	https://github.com/addyosmani/agent-skills.git
+agent-skills@portable-agent-skills	7829ffd90d97	local pinned checkout
 i-have-adhd@i-have-adhd	0.1.0	https://github.com/ayghri/i-have-adhd.git

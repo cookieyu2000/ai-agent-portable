@@ -35,7 +35,10 @@ claude_output="$(
     "${BUNDLE_ROOT}/install-claude.sh" --dry-run
 )"
 grep -Fq '[dry-run]' <<<"${claude_output}"
-grep -Fq 'agent-skills@addy-agent-skills' <<<"${claude_output}"
+grep -Fq 'agent-skills@portable-agent-skills' <<<"${claude_output}"
+grep -Fq \
+    "${TEST_ROOT}/sources/claude-marketplaces/portable-agent-skills" \
+    <<<"${claude_output}"
 grep -Fq 'i-have-adhd@i-have-adhd' <<<"${claude_output}"
 grep -Fq '.claude/skills/karpathy-guidelines' <<<"${claude_output}"
 if grep -Fq -- '--scope' <<<"${claude_output}"; then

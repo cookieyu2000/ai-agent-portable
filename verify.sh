@@ -22,6 +22,7 @@ check_file manifests/agent-skills.txt
 check_file manifests/common-skills.txt
 check_file manifests/codex-plugins.txt
 check_file manifests/claude-plugins.txt
+check_file claude-marketplaces/portable-agent-skills/.claude-plugin/marketplace.json
 check_file skills/karpathy-guidelines/SKILL.md
 check_file scripts/bootstrap.sh
 check_file scripts/skill_inventory.py
@@ -48,6 +49,31 @@ if [[ "${skill_count}" -eq 24 ]]; then
     printf 'ok: agent skill inventory (%s)\n' "${skill_count}"
 else
     printf 'unexpected agent skill count: %s\n' "${skill_count}" >&2
+    errors=$((errors + 1))
+fi
+
+agent_skills_commit="$(
+    awk -F '\t' '$1 == "agent-skills" { print $3 }' \
+        "${BUNDLE_ROOT}/manifests/sources.tsv"
+)"
+agent_skills_version="${agent_skills_commit:0:12}"
+if grep -F "\"version\": \"${agent_skills_version}\"" \
+    "${BUNDLE_ROOT}/claude-marketplaces/portable-agent-skills/.claude-plugin/marketplace.json" \
+    >/dev/null; then
+    printf 'ok: portable Claude marketplace version (%s)\n' \
+        "${agent_skills_version}"
+else
+    printf 'portable Claude marketplace version is not pinned to %s\n' \
+        "${agent_skills_version}" >&2
+    errors=$((errors + 1))
+fi
+
+if grep -F '"source": "./agent-skills"' \
+    "${BUNDLE_ROOT}/claude-marketplaces/portable-agent-skills/.claude-plugin/marketplace.json" \
+    >/dev/null; then
+    printf 'ok: portable Claude marketplace uses local plugin source\n'
+else
+    printf 'portable Claude marketplace does not use its local checkout\n' >&2
     errors=$((errors + 1))
 fi
 

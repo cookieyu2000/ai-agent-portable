@@ -152,14 +152,14 @@ claude_plugin_installed() {
 ensure_claude_plugin() {
     local plugin_id="$1"
     if [[ "${MODE}" == "dry-run" ]]; then
-        run claude plugin install "${plugin_id}" --scope user
+        run claude plugin install "${plugin_id}"
         return
     fi
     if claude_plugin_installed "${plugin_id}"; then
-        run claude plugin update "${plugin_id}" --scope user
+        run claude plugin update "${plugin_id}"
         return
     fi
-    run claude plugin install "${plugin_id}" --scope user
+    run claude plugin install "${plugin_id}"
 }
 
 claude_marketplace_installed() {
@@ -170,14 +170,14 @@ ensure_claude_marketplace() {
     local marketplace_name="$1"
     local marketplace_source="$2"
     if [[ "${MODE}" == "dry-run" ]]; then
-        run claude plugin marketplace add "${marketplace_source}" --scope user
+        run claude plugin marketplace add "${marketplace_source}"
         return
     fi
     if claude_marketplace_installed "${marketplace_name}"; then
         log "ok: Claude marketplace already configured: ${marketplace_name}"
         return
     fi
-    run claude plugin marketplace add "${marketplace_source}" --scope user
+    run claude plugin marketplace add "${marketplace_source}"
 }
 
 install_codex() {

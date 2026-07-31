@@ -27,6 +27,7 @@ codex_output="$(
 grep -Fq '[dry-run]' <<<"${codex_output}"
 grep -Fq 'github@openai-curated' <<<"${codex_output}"
 grep -Fq 'i-have-adhd@i-have-adhd' <<<"${codex_output}"
+grep -Fq '.codex/skills/backend-api-contracts' <<<"${codex_output}"
 
 claude_output="$(
     env -u CODEX_HOME -u CLAUDE_CONFIG_DIR \
@@ -41,6 +42,7 @@ grep -Fq \
     <<<"${claude_output}"
 grep -Fq 'i-have-adhd@i-have-adhd' <<<"${claude_output}"
 grep -Fq '.claude/skills/karpathy-guidelines' <<<"${claude_output}"
+grep -Fq '.claude/skills/backend-api-contracts' <<<"${claude_output}"
 if grep -Fq -- '--scope' <<<"${claude_output}"; then
     printf 'Claude dry-run uses unsupported --scope compatibility flag\n' >&2
     exit 1

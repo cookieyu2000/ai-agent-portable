@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend API Contracts"
+  short_description: "Stable observable backend API contract practices"
+  default_prompt: "Use $backend-api-contracts to design or change this backend API without breaking its contract."

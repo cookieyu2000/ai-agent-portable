@@ -1,5 +1,6 @@
 # Shared Codex and Claude baseline
 api-and-interface-design
+backend-api-contracts
 browser-testing-with-devtools
 ci-cd-and-automation
 code-review-and-quality

@@ -241,6 +241,7 @@ install_codex() {
     done <"${BUNDLE_ROOT}/manifests/agent-skills.txt"
 
     install_bundled_skill karpathy-guidelines "${CODEX_CONFIG_ROOT}"
+    install_bundled_skill backend-api-contracts "${CODEX_CONFIG_ROOT}"
     ensure_codex_plugin github@openai-curated
     ensure_codex_plugin hugging-face@openai-curated
     ensure_codex_marketplace i-have-adhd "${adhd_path}"
@@ -259,6 +260,7 @@ install_claude() {
     ensure_claude_marketplace i-have-adhd "${adhd_path}"
     ensure_claude_plugin i-have-adhd@i-have-adhd
     install_bundled_skill karpathy-guidelines "${CLAUDE_CONFIG_ROOT}"
+    install_bundled_skill backend-api-contracts "${CLAUDE_CONFIG_ROOT}"
 }
 
 while [[ $# -gt 0 ]]; do

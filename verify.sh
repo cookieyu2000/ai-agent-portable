@@ -24,6 +24,7 @@ check_file manifests/codex-plugins.txt
 check_file manifests/claude-plugins.txt
 check_file claude-marketplaces/portable-agent-skills/.claude-plugin/marketplace.json
 check_file skills/karpathy-guidelines/SKILL.md
+check_file skills/backend-api-contracts/SKILL.md
 check_file scripts/bootstrap.sh
 check_file scripts/skill_inventory.py
 check_file tests/test_skill_inventory.py
@@ -80,7 +81,7 @@ fi
 common_skill_count="$(
     grep -c '^[a-z]' "${BUNDLE_ROOT}/manifests/common-skills.txt"
 )"
-if [[ "${common_skill_count}" -eq 26 ]]; then
+if [[ "${common_skill_count}" -eq 27 ]]; then
     printf 'ok: common Codex/Claude baseline (%s)\n' "${common_skill_count}"
 else
     printf 'unexpected common skill count: %s\n' "${common_skill_count}" >&2
@@ -96,7 +97,7 @@ while IFS= read -r skill_name; do
     fi
 done <"${BUNDLE_ROOT}/manifests/agent-skills.txt"
 
-for skill_name in karpathy-guidelines i-have-adhd; do
+for skill_name in karpathy-guidelines backend-api-contracts i-have-adhd; do
     if ! grep -Fx "${skill_name}" \
         "${BUNDLE_ROOT}/manifests/common-skills.txt" >/dev/null; then
         printf 'common baseline is missing portable skill: %s\n' \

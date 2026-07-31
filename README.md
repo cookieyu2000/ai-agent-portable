@@ -7,9 +7,9 @@ repository 不保存 plugin cache 或登入憑證；新裝置透過來源 manife
 connector 則重新授權。
 
 目前兩個 agent 的共同基線是
-[26 個 skills](./manifests/common-skills.txt)：24 個 `agent-skills`、`i-have-adhd`
-與 `karpathy-guidelines`。Codex 的 GitHub、Hugging Face 與內建 skills 維持為
-Codex 專用，不會假裝成 Claude 可用的 skill。
+[27 個 skills](./manifests/common-skills.txt)：24 個 `agent-skills`、`i-have-adhd`、
+`karpathy-guidelines` 與 `backend-api-contracts`。Codex 的 GitHub、Hugging Face
+與內建 skills 維持為 Codex 專用，不會假裝成 Claude 可用的 skill。
 
 ## 新裝置安裝
 
@@ -62,6 +62,7 @@ Codex：
 - Codex 內建 skills：由 Codex 安裝本身提供。
 - `agent-skills`：clone 固定 commit，建立 `~/.codex/skills/` symbolic links。
 - `karpathy-guidelines`：從此 repository 複製。
+- `backend-api-contracts`：從此 repository 複製。
 - GitHub、Hugging Face 與 `i-have-adhd` plugins。
 
 Claude Code：
@@ -70,6 +71,7 @@ Claude Code：
  透過 SSH 或 HTTPS clone。
 - `i-have-adhd@i-have-adhd`
 - `karpathy-guidelines`：從此 repository 複製至 `~/.claude/skills/`。
+- `backend-api-contracts`：從此 repository 複製至 `~/.claude/skills/`。
 
 需要人工處理：
 

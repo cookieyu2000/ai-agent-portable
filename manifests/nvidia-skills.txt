@@ -1,0 +1,12 @@
+# Pinned NVIDIA skills subset; only direct children of NVIDIA/skills/skills/.
+# One Skill per line. New entries must exist at the pinned NVIDIA commit.
+compute-sanitizer-diagnose-cuda-bugs
+deepstream-dev
+deepstream-profile-pipeline
+dynamo-troubleshoot
+foundationpose-pipeline
+i4h-lerobot-viz
+nemo-retriever
+physical-ai-physics-selection
+rag-blueprint
+warp-debug-gradients

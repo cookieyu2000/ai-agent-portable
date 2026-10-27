@@ -9,3 +9,5 @@ complete upstream repositories.
   `skills/karpathy-guidelines/`.
 - OpenAI curated plugins are reinstalled from the marketplace and are not
   copied into this repository.
+- `NVIDIA/skills`: pinned in `manifests/sources.tsv`. Skill-specific licensing
+  varies; selected skills are downloaded on demand and not redistributed here.

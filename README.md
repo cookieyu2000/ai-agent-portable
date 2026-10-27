@@ -6,6 +6,10 @@
 repository 不保存 plugin cache 或登入憑證；新裝置透過來源 manifest 重新安裝，
 connector 則重新授權。
 
+可選配的 NVIDIA Skills 已整合進 [NVIDIA 安裝指南](./docs/nvidia-integration.md)：
+Linux 使用 `./install-all.sh --with-nvidia --apply`；Windows 不需 npx，
+使用 `.\install-nvidia.ps1 -Target Both -Apply`（PowerShell）。
+
 目前兩個 agent 的共同基線是
 [27 個 skills](./manifests/common-skills.txt)：24 個 `agent-skills`、`i-have-adhd`、
 `karpathy-guidelines` 與 `backend-api-contracts`。Codex 的 GitHub、Hugging Face

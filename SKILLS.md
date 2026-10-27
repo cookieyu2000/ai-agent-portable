@@ -1,9 +1,16 @@
-# Codex and Claude Skill Inventory
+# Codex 與 Claude 舊環境盤點快照
 
-Total unique skills: **82**
+本檔保留先前環境的 **82 個不重複項目**，包含內建 skills、plugin skills 與
+Claude commands。這是歷史 filesystem inventory，不代表目前 portable 安裝清單，
+也不表示這些項目已安裝於新裝置。
 
-> A filesystem inventory can include cached or internal skills that are
-> not exposed to every agent session.
+目前 portable manifest 為 **417 個 NVIDIA skills ＋ 27 個通用技能，共 444 個**，
+詳見 [nvidia-skills.txt](./manifests/nvidia-skills.txt)、
+[common-skills.txt](./manifests/common-skills.txt) 與 [README.md](./README.md)。
+以下原始盤點表予以保留；如需目前環境資料，執行 `./list-skills.sh` 檢視。
+
+> Filesystem inventory 可能包含 cached 或 internal skills；不同 agent session
+> 公開的項目可能不同，計算範圍也不同於 portable manifest。
 
 | # | Skill | Platform | Source | Description |
 |---:|---|---|---|---|

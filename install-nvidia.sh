@@ -48,41 +48,102 @@ while IFS= read -r name || [[ -n "${name}" ]]; do
 done < "${MANIFEST}"
 ((${#skills[@]} > 0)) || fail "No NVIDIA skills in manifest"
 
-if [[ "${MODE}" == dry-run ]]; then
-    if [[ ! -e "${repo_path}" ]]; then
+validation_repo="${repo_path}"
+temp_path=""
+if [[ ! -e "${repo_path}" && ! -L "${repo_path}" ]]; then
+    if [[ "${MODE}" == dry-run ]]; then
         log "[dry-run] git clone ${url} ${repo_path}"
         log "[dry-run] git -C ${repo_path} checkout --detach ${pinned_commit}"
+        validation_repo=""
     else
-        log "[dry-run] verify pinned NVIDIA checkout: ${repo_path} (${pinned_commit})"
-    fi
-else
-    if [[ ! -e "${repo_path}" ]]; then
         mkdir -p "${SOURCE_ROOT}"
-        temp_path="${repo_path}.tmp.$$"
-        [[ ! -e "${temp_path}" ]] || fail "temporary clone path already exists: ${temp_path}"
-        cleanup() { [[ ! -e "${temp_path:-}" ]] || rm -rf -- "${temp_path}"; }
+        temp_path="$(mktemp -d "${repo_path}.tmp.XXXXXX")"
+        cleanup() {
+            [[ -n "${temp_path}" && -d "${temp_path}" && ! -L "${temp_path}" ]] || return 0
+            local parent expected_parent basename
+            parent="$(cd "$(dirname "${temp_path}")" && pwd -P)"
+            expected_parent="$(cd "${SOURCE_ROOT}" && pwd -P)"
+            basename="${temp_path##*/}"
+            # Delete only this clone's checked temporary directory under SOURCE_ROOT.
+            if [[ "${parent}" == "${expected_parent}" && "${basename}" == nvidia-skills.tmp.* ]]; then
+                rm -rf -- "${parent}/${basename}"
+            fi
+        }
         trap cleanup EXIT
         git clone "${url}" "${temp_path}"
         git -C "${temp_path}" checkout --detach "${pinned_commit}"
-        mv -- "${temp_path}" "${repo_path}"
-        trap - EXIT
+        validation_repo="${temp_path}"
     fi
-    [[ -d "${repo_path}/.git" ]] || fail "source path is not a Git checkout: ${repo_path}"
-    actual_commit="$(git -C "${repo_path}" rev-parse HEAD)"
+fi
+
+if [[ -n "${validation_repo}" ]]; then
+    [[ -d "${validation_repo}/.git" ]] || fail "source path is not a Git checkout: ${validation_repo}"
+    actual_commit="$(git -C "${validation_repo}" rev-parse HEAD)"
     [[ "${actual_commit}" == "${pinned_commit}" ]] ||
         fail "NVIDIA source is at ${actual_commit}; manifest expects ${pinned_commit}; not changing it"
+    git -C "${validation_repo}" diff --quiet HEAD -- skills LICENSE-APACHE LICENSE-CC-BY-4.0 ||
+        fail "NVIDIA source has modified tracked skill or license files: ${validation_repo}"
     for name in "${skills[@]}"; do
-        [[ -f "${repo_path}/skills/${name}/SKILL.md" ]] ||
+        [[ -f "${validation_repo}/skills/${name}/SKILL.md" ]] ||
             fail "missing NVIDIA skill at pinned commit: ${name}"
     done
+    for license in LICENSE-APACHE LICENSE-CC-BY-4.0; do
+        [[ -f "${validation_repo}/${license}" ]] || fail "missing NVIDIA license: ${license}"
+    done
+fi
+
+destination_root_for() {
+    case "$1" in
+        codex) printf '%s/skills' "${CODEX_HOME:-${HOME}/.codex}" ;;
+        claude) printf '%s/skills' "${CLAUDE_CONFIG_DIR:-${HOME}/.claude}" ;;
+    esac
+}
+
+preflight_for() {
+    local agent="$1" destination_root source_path destination name ancestor
+    destination_root="$(destination_root_for "${agent}")"
+    ancestor="${destination_root}"
+    while [[ ! -e "${ancestor}" && ! -L "${ancestor}" ]]; do
+        ancestor="$(dirname "${ancestor}")"
+    done
+    [[ -d "${ancestor}" ]] || fail "skill root ancestor is not a directory: ${ancestor}"
+    for name in "${skills[@]}"; do
+        source_path="${repo_path}/skills/${name}"
+        destination="${destination_root}/${name}"
+        if [[ -L "${destination}" ]]; then
+            [[ "$(readlink "${destination}")" == "${source_path}" ]] ||
+                fail "existing NVIDIA skill link points elsewhere: ${destination}"
+        elif [[ -e "${destination}" ]]; then
+            [[ -n "${validation_repo}" ]] ||
+                fail "cannot compare existing skill without the pinned NVIDIA source: ${destination}"
+            [[ -d "${destination}" ]] &&
+                diff -qr "${validation_repo}/skills/${name}" "${destination}" >/dev/null ||
+                fail "different skill already exists, refusing to overwrite: ${destination}"
+        fi
+    done
+}
+
+# Check every target before creating any skill, including the second target of --target both.
+case "${TARGET}" in
+    codex) preflight_for codex ;;
+    claude) preflight_for claude ;;
+    both) preflight_for codex; preflight_for claude ;;
+esac
+
+if [[ -n "${temp_path}" ]]; then
+    [[ ! -e "${repo_path}" && ! -L "${repo_path}" ]] || fail "NVIDIA source path appeared during installation: ${repo_path}"
+    mv -- "${temp_path}" "${repo_path}"
+    temp_path=""
+    validation_repo="${repo_path}"
+    trap - EXIT
 fi
 
 install_for() {
     local agent="$1" destination_root source_path destination name
-    case "${agent}" in
-        codex) destination_root="${CODEX_HOME:-${HOME}/.codex}/skills" ;;
-        claude) destination_root="${CLAUDE_CONFIG_DIR:-${HOME}/.claude}/skills" ;;
-    esac
+    destination_root="$(destination_root_for "${agent}")"
+    if [[ "${MODE}" == apply ]]; then
+        mkdir -p "${destination_root}"
+    fi
     for name in "${skills[@]}"; do
         source_path="${repo_path}/skills/${name}"
         destination="${destination_root}/${name}"
@@ -91,11 +152,12 @@ install_for() {
         elif [[ -L "${destination}" ]]; then
             [[ "$(readlink "${destination}")" == "${source_path}" ]] ||
                 fail "existing NVIDIA skill link points elsewhere: ${destination}"
-            log "ok: already linked ${destination}"
+            log "ok: NVIDIA skill already installed: ${destination}"
         elif [[ -e "${destination}" ]]; then
-            fail "Skill already exists, refusing to overwrite: ${destination}"
+            [[ -d "${destination}" ]] && diff -qr "${source_path}" "${destination}" >/dev/null ||
+                fail "different skill already exists, refusing to overwrite: ${destination}"
+            log "ok: NVIDIA skill already installed: ${destination}"
         else
-            mkdir -p "${destination_root}"
             ln -s "${source_path}" "${destination}"
             log "installed: ${agent}/${name}"
         fi
@@ -107,4 +169,5 @@ case "${TARGET}" in
     claude) install_for claude ;;
     both) install_for codex; install_for claude ;;
 esac
-log "complete: NVIDIA ${#skills[@]}-skill selection for ${TARGET} (${MODE})"
+log "licenses: ${repo_path}/LICENSE-APACHE and ${repo_path}/LICENSE-CC-BY-4.0"
+log "complete: NVIDIA ${#skills[@]}-skill catalog for ${TARGET} (${MODE})"

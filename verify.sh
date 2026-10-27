@@ -20,6 +20,7 @@ check_file list-skills.sh
 check_file manifests/sources.tsv
 check_file manifests/agent-skills.txt
 check_file manifests/common-skills.txt
+check_file manifests/nvidia-skills.txt
 check_file manifests/codex-plugins.txt
 check_file manifests/claude-plugins.txt
 check_file claude-marketplaces/portable-agent-skills/.claude-plugin/marketplace.json
@@ -28,6 +29,12 @@ check_file skills/backend-api-contracts/SKILL.md
 check_file scripts/bootstrap.sh
 check_file scripts/skill_inventory.py
 check_file tests/test_skill_inventory.py
+check_file install-nvidia.sh
+check_file install-nvidia.ps1
+check_file tests/test_nvidia_integration.sh
+check_file tests/test_nvidia_powershell.ps1
+check_file docs/nvidia-integration.md
+check_file .gitattributes
 
 while IFS=$'\t' read -r name url commit destination; do
     [[ "${name}" == \#* || -z "${name}" ]] && continue
@@ -85,6 +92,17 @@ if [[ "${common_skill_count}" -eq 27 ]]; then
     printf 'ok: common Codex/Claude baseline (%s)\n' "${common_skill_count}"
 else
     printf 'unexpected common skill count: %s\n' "${common_skill_count}" >&2
+    errors=$((errors + 1))
+fi
+
+nvidia_skill_count="$(grep -c '^[a-z]' "${BUNDLE_ROOT}/manifests/nvidia-skills.txt")"
+nvidia_unique_count="$(grep '^[a-z]' "${BUNDLE_ROOT}/manifests/nvidia-skills.txt" | LC_ALL=C sort -u | wc -l | tr -d ' ')"
+portable_skill_count="$(cat "${BUNDLE_ROOT}/manifests/common-skills.txt" "${BUNDLE_ROOT}/manifests/nvidia-skills.txt" | grep '^[a-z]' | LC_ALL=C sort -u | wc -l | tr -d ' ')"
+if [[ "${nvidia_skill_count}" -eq 417 && "${nvidia_unique_count}" -eq 417 && "${portable_skill_count}" -eq 444 ]]; then
+    printf 'ok: complete NVIDIA catalog (417); portable skills (444)\n'
+else
+    printf 'unexpected NVIDIA/unique/portable counts: %s/%s/%s\n' \
+        "${nvidia_skill_count}" "${nvidia_unique_count}" "${portable_skill_count}" >&2
     errors=$((errors + 1))
 fi
 

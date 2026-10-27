@@ -3,13 +3,14 @@ set -euo pipefail
 
 BUNDLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="dry-run"
+WITH_NVIDIA=true
 TARGET=""
 SOURCE_ROOT="${AI_AGENT_SOURCE_ROOT:-${HOME}/src/ai-agent-sources}"
 CODEX_CONFIG_ROOT="${CODEX_HOME:-${HOME}/.codex}"
 CLAUDE_CONFIG_ROOT="${CLAUDE_CONFIG_DIR:-${HOME}/.claude}"
 
 usage() {
-    echo "Usage: $0 --target codex|claude [--dry-run|--apply]"
+    echo "Usage: $0 --target codex|claude [--dry-run|--apply] [--with-nvidia|--without-nvidia]"
 }
 
 log() {
@@ -33,6 +34,30 @@ fail() {
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
+}
+
+prefer_nvidia() {
+    [[ "${WITH_NVIDIA}" == true ]] &&
+        grep -Fxq -- "$1" "${BUNDLE_ROOT}/manifests/nvidia-skills.txt"
+}
+
+skip_baseline_skill() {
+    if prefer_nvidia "$1"; then
+        log "prefer NVIDIA: skip baseline skill $1"
+        return 0
+    fi
+    return 1
+}
+
+claude_agent_skills_overlap() {
+    local skill_name
+    while IFS= read -r skill_name || [[ -n "${skill_name}" ]]; do
+        [[ -n "${skill_name}" && "${skill_name}" != \#* ]] || continue
+        if prefer_nvidia "${skill_name}"; then
+            return 0
+        fi
+    done <"${BUNDLE_ROOT}/manifests/agent-skills.txt"
+    return 1
 }
 
 source_record() {
@@ -93,6 +118,10 @@ install_bundled_skill() {
     local config_root="$2"
     local source_path="${BUNDLE_ROOT}/skills/${skill_name}"
     local destination_path="${config_root}/skills/${skill_name}"
+
+    if skip_baseline_skill "${skill_name}"; then
+        return
+    fi
 
     if [[ -d "${destination_path}" && ! -L "${destination_path}" ]]; then
         if diff -qr "${source_path}" "${destination_path}" >/dev/null; then
@@ -156,7 +185,7 @@ ensure_claude_plugin() {
         return
     fi
     if claude_plugin_installed "${plugin_id}"; then
-        run claude plugin update "${plugin_id}"
+        log "ok: Claude plugin already installed: ${plugin_id}"
         return
     fi
     run claude plugin install "${plugin_id}"
@@ -212,6 +241,21 @@ ensure_claude_agent_skills() {
     local agent_skills_path="$1"
     local marketplace_path
 
+    if claude_agent_skills_overlap; then
+        log "prefer NVIDIA: install remaining Claude agent skills individually; plugin commands are not included"
+        local skill_name
+        while IFS= read -r skill_name || [[ -n "${skill_name}" ]]; do
+            [[ -n "${skill_name}" && "${skill_name}" != \#* ]] || continue
+            if skip_baseline_skill "${skill_name}"; then
+                continue
+            fi
+            ensure_symlink \
+                "${agent_skills_path}/skills/${skill_name}" \
+                "${CLAUDE_CONFIG_ROOT}/skills/${skill_name}"
+        done <"${BUNDLE_ROOT}/manifests/agent-skills.txt"
+        return
+    fi
+
     if [[ "${MODE}" == "apply" ]] &&
         claude_plugin_installed agent-skills@addy-agent-skills; then
         log "ok: compatible legacy Claude plugin already installed: agent-skills@addy-agent-skills"
@@ -231,10 +275,15 @@ install_codex() {
     require_command git
 
     ensure_repo agent-skills agent_skills_path
-    ensure_repo i-have-adhd adhd_path
+    if ! prefer_nvidia i-have-adhd; then
+        ensure_repo i-have-adhd adhd_path
+    fi
 
     while IFS= read -r skill_name; do
         [[ -n "${skill_name}" ]] || continue
+        if skip_baseline_skill "${skill_name}"; then
+            continue
+        fi
         ensure_symlink \
             "${agent_skills_path}/skills/${skill_name}" \
             "${CODEX_CONFIG_ROOT}/skills/${skill_name}"
@@ -244,8 +293,10 @@ install_codex() {
     install_bundled_skill backend-api-contracts "${CODEX_CONFIG_ROOT}"
     ensure_codex_plugin github@openai-curated
     ensure_codex_plugin hugging-face@openai-curated
-    ensure_codex_marketplace i-have-adhd "${adhd_path}"
-    ensure_codex_plugin i-have-adhd@i-have-adhd
+    if ! skip_baseline_skill i-have-adhd; then
+        ensure_codex_marketplace i-have-adhd "${adhd_path}"
+        ensure_codex_plugin i-have-adhd@i-have-adhd
+    fi
 }
 
 install_claude() {
@@ -254,11 +305,15 @@ install_claude() {
     require_command git
 
     ensure_repo agent-skills agent_skills_path
-    ensure_repo i-have-adhd adhd_path
+    if ! prefer_nvidia i-have-adhd; then
+        ensure_repo i-have-adhd adhd_path
+    fi
 
     ensure_claude_agent_skills "${agent_skills_path}"
-    ensure_claude_marketplace i-have-adhd "${adhd_path}"
-    ensure_claude_plugin i-have-adhd@i-have-adhd
+    if ! skip_baseline_skill i-have-adhd; then
+        ensure_claude_marketplace i-have-adhd "${adhd_path}"
+        ensure_claude_plugin i-have-adhd@i-have-adhd
+    fi
     install_bundled_skill karpathy-guidelines "${CLAUDE_CONFIG_ROOT}"
     install_bundled_skill backend-api-contracts "${CLAUDE_CONFIG_ROOT}"
 }
@@ -278,6 +333,14 @@ while [[ $# -gt 0 ]]; do
             MODE="apply"
             shift
             ;;
+        --with-nvidia)
+            WITH_NVIDIA=true
+            shift
+            ;;
+        --without-nvidia)
+            WITH_NVIDIA=false
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
@@ -287,6 +350,30 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+[[ "${TARGET}" == codex || "${TARGET}" == claude ]] || {
+    usage
+    fail "--target must be codex or claude"
+}
+
+require_command "${TARGET}"
+require_command git
+if prefer_nvidia i-have-adhd; then
+    if { [[ "${TARGET}" == codex ]] && codex_plugin_installed i-have-adhd@i-have-adhd; } ||
+        { [[ "${TARGET}" == claude ]] && claude_plugin_installed i-have-adhd@i-have-adhd; }; then
+        fail "existing ${TARGET} plugin i-have-adhd@i-have-adhd includes a skill preferred from NVIDIA; remove it explicitly or use --without-nvidia. No existing plugin was changed."
+    fi
+fi
+if [[ "${TARGET}" == claude ]] && claude_agent_skills_overlap; then
+    for plugin_id in agent-skills@addy-agent-skills agent-skills@portable-agent-skills; do
+        if claude_plugin_installed "${plugin_id}"; then
+            fail "existing Claude plugin ${plugin_id} includes skills preferred from NVIDIA; remove it explicitly or use --without-nvidia. No existing plugin was changed."
+        fi
+    done
+fi
+if [[ "${WITH_NVIDIA}" == true ]]; then
+    bash "${BUNDLE_ROOT}/install-nvidia.sh" --target "${TARGET}" "--${MODE}"
+fi
 
 case "${TARGET}" in
     codex)

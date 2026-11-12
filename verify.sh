@@ -34,7 +34,34 @@ check_file install-nvidia.ps1
 check_file tests/test_nvidia_integration.sh
 check_file tests/test_nvidia_powershell.ps1
 check_file docs/nvidia-integration.md
+check_file manifests/optional-sources.json
+check_file scripts/install_optional.py
+check_file install-optional.sh
+check_file install-optional.ps1
+check_file tests/test_optional_installer.py
+check_file tests/test_optional_powershell.ps1
+check_file docs/optional-integrations.md
+check_file docs/hallmark.md
+check_file docs/codync.md
 check_file .gitattributes
+
+# Inspect the optional manifest without using this user's agent/source directories.
+optional_preview_root="${TMPDIR:-/tmp}/ai-agent-portable-verify-$$"
+if python3 -B "${BUNDLE_ROOT}/scripts/install_optional.py" \
+    --package hallmark --target both --dry-run \
+    --source-root "${optional_preview_root}/sources" \
+    --runtime-root "${optional_preview_root}/runtimes" \
+    --codex-home "${optional_preview_root}/codex" \
+    --claude-home "${optional_preview_root}/claude" >/dev/null; then
+    printf 'ok: optional manifest and side-effect-free preview\n'
+else
+    printf 'optional manifest or preview failed\n' >&2
+    errors=$((errors + 1))
+fi
+if [[ -e "${optional_preview_root}" ]]; then
+    printf 'optional dry-run unexpectedly wrote files: %s\n' "${optional_preview_root}" >&2
+    errors=$((errors + 1))
+fi
 
 while IFS=$'\t' read -r name url commit destination; do
     [[ "${name}" == \#* || -z "${name}" ]] && continue

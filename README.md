@@ -4,6 +4,8 @@
 
 在不同設備上重建 Codex／Claude Code 的 skills 與 plugins。此 repository 保存可攜技能、固定來源 manifest、安裝 scripts 與文件；外部技能在明確 apply 時取得。登入、connectors 授權與個人設定由每台設備自行處理。
 
+另提供 **Hallmark 網頁設計技能 + Codync 手機辦公／進度／排程**的[選配安裝](./docs/optional-integrations.md)。Hallmark 是額外 1 個 skill；Codync 是獨立 host 工具，兩者不改變下方 444 個基線清單。Linux／WSL／macOS 可執行 `./install-optional.sh --package all --target codex --dry-run` 預覽，改成 `--apply` 才安裝；Windows PowerShell 的 Hallmark 與 Codync 桌面版路徑見選配指南。安裝完成後依 [Codync 指南](./docs/codync.md)啟用服務、配對手機及設定 `Asia/Taipei` 排程。
+
 目前固定的 portable 清單為 **444 個不重複 skills**：
 
 | 來源 | 數量 | 安裝清單／來源 citation |
@@ -27,6 +29,7 @@
 - [Linux／WSL：完整安裝到 Codex](#linux-wsl)
 - [macOS：完整安裝到 Codex](#macos)
 - [其他安裝組合與自訂位置](#options)
+- [Hallmark 與 Codync 選配安裝](./docs/optional-integrations.md)
 - [安裝後驗證與 Codex 載入位置](#verification)
 - [NVIDIA 優先規則](#nvidia-first)
 - [更新、重跑與衝突處理](#maintenance)
@@ -377,6 +380,8 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 ## 來源、版本與授權
 
 外部 skills 版本由 [sources.tsv](./manifests/sources.tsv) 管理；逐項 citation 使用固定 SHA，不使用浮動 `main`：
+
+Hallmark 2.0.0 與 Codync 2.43.1 的選配來源另由 [optional-sources.json](./manifests/optional-sources.json) 固定；Codync 各平台 release archive 同時固定 SHA256。操作與資料位置見[選配指南](./docs/optional-integrations.md)。
 
 | 來源 | 固定版本／citation | 用途 |
 |---|---|---|

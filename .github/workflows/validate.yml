@@ -38,3 +38,7 @@ jobs:
       - name: Validate native Windows installer
         shell: powershell
         run: ./tests/test_nvidia_powershell.ps1
+
+      - name: Validate optional Windows installer
+        shell: powershell
+        run: ./tests/test_optional_powershell.ps1

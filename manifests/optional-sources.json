@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "packages": {
+    "hallmark": {
+      "kind": "skill",
+      "version": "2.0.0",
+      "repository": "https://github.com/Nutlope/hallmark.git",
+      "commit": "407fa689f4a276f2fd389208d271d0fef08f5058",
+      "skill_path": "skills/hallmark",
+      "skill_name": "hallmark",
+      "license": "MIT",
+      "license_files": [
+        "LICENSE"
+      ],
+      "documentation": "docs/hallmark.md"
+    },
+    "codync": {
+      "kind": "runtime",
+      "version": "2.43.1",
+      "release_tag": "v2.43.1",
+      "repository": "https://github.com/leepokai/Codync.git",
+      "commit": "b1f2b53ca7e2c31b66c531338013a7ef7210491a",
+      "license": "Apache-2.0",
+      "license_files": [
+        "LICENSE"
+      ],
+      "documentation": "docs/codync.md",
+      "release_url": "https://github.com/leepokai/Codync/releases/tag/v2.43.1",
+      "assets": {
+        "linux-arm64": {
+          "url": "https://github.com/leepokai/Codync/releases/download/v2.43.1/codync-host-linux-arm64.tar.gz",
+          "sha256": "4b52577ce50b387a225804503919ed6da5d13008c62a31f5a682912744d00cd2",
+          "format": "tar.gz",
+          "archive_member": "codync-host-linux-arm64/codync-host",
+          "executable": "codync-host"
+        },
+        "linux-x86_64": {
+          "url": "https://github.com/leepokai/Codync/releases/download/v2.43.1/codync-host-linux-x86_64.tar.gz",
+          "sha256": "2be1b8a42002c9a110af7363f052c357554d6d807a6683bf426334d2e8050340",
+          "format": "tar.gz",
+          "archive_member": "codync-host-linux-x86_64/codync-host",
+          "executable": "codync-host"
+        },
+        "macos-arm64": {
+          "url": "https://github.com/leepokai/Codync/releases/download/v2.43.1/codync-host-macos-arm64.tar.gz",
+          "sha256": "122a32a90269a01a1c2b1bfa3cac14833d7af695382df2bc53ebd9817e79cc24",
+          "format": "tar.gz",
+          "archive_member": "codync-host-macos-arm64/codync-host",
+          "executable": "codync-host"
+        },
+        "macos-x86_64": {
+          "url": "https://github.com/leepokai/Codync/releases/download/v2.43.1/codync-host-macos-x86_64.tar.gz",
+          "sha256": "aabcd4e8700d49803e9fa920bdbefebc7295e9fe8c067384270eaca6919b30f7",
+          "format": "tar.gz",
+          "archive_member": "codync-host-macos-x86_64/codync-host",
+          "executable": "codync-host"
+        }
+      }
+    }
+  }
+}

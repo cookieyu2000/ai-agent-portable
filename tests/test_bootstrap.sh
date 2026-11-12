@@ -6,7 +6,16 @@ TEST_ROOT="$(mktemp -d)"
 trap 'rm -rf "${TEST_ROOT}"' EXIT
 
 mkdir -p "${TEST_ROOT}/bin"
-printf '#!/usr/bin/env bash\nexit 0\n' >"${TEST_ROOT}/bin/codex"
+cat >"${TEST_ROOT}/bin/codex" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+    'plugin list --available --json')
+        printf '%s\n' '{"installed":[],"available":[{"pluginId":"github@openai-curated","installed":false},{"pluginId":"hugging-face@openai-curated","installed":false}]}' ;;
+    'plugin marketplace list --json')
+        printf '%s\n' '{"marketplaces":[{"name":"openai-curated"}]}' ;;
+    *) printf 'unexpected fake Codex invocation: %s\n' "$*" >&2; exit 1 ;;
+esac
+EOF
 printf '#!/usr/bin/env bash\nexit 0\n' >"${TEST_ROOT}/bin/claude"
 chmod +x "${TEST_ROOT}/bin/codex" "${TEST_ROOT}/bin/claude"
 

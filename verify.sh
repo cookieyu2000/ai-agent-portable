@@ -27,8 +27,10 @@ check_file claude-marketplaces/portable-agent-skills/.claude-plugin/marketplace.
 check_file skills/karpathy-guidelines/SKILL.md
 check_file skills/backend-api-contracts/SKILL.md
 check_file scripts/bootstrap.sh
+check_file scripts/codex_plugins.py
 check_file scripts/skill_inventory.py
 check_file tests/test_skill_inventory.py
+check_file tests/test_codex_plugins.py
 check_file install-nvidia.sh
 check_file install-nvidia.ps1
 check_file tests/test_nvidia_integration.sh

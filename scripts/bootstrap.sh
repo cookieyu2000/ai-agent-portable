@@ -4,13 +4,22 @@ set -euo pipefail
 BUNDLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="dry-run"
 WITH_NVIDIA=true
+SKIP_HUGGING_FACE=false
+CODEX_GITHUB_PLUGIN="github@openai-curated"
 TARGET=""
 SOURCE_ROOT="${AI_AGENT_SOURCE_ROOT:-${HOME}/src/ai-agent-sources}"
 CODEX_CONFIG_ROOT="${CODEX_HOME:-${HOME}/.codex}"
 CLAUDE_CONFIG_ROOT="${CLAUDE_CONFIG_DIR:-${HOME}/.claude}"
+PYTHON_COMMAND="${PYTHON_COMMAND:-python3}"
+CODEX_INSTALLED_PLUGINS=()
+CODEX_MARKETPLACES=()
+CODEX_AGENT_SKILLS_PATH=""
+CODEX_ADHD_PATH=""
 
 usage() {
-    echo "Usage: $0 --target codex|claude [--dry-run|--apply] [--with-nvidia|--without-nvidia]"
+    echo "Usage: $0 --target codex|claude [--dry-run|--apply] [--with-nvidia|--without-nvidia] [--skip-hugging-face] [--github-plugin ID]"
+    echo "  --skip-hugging-face  Skip the Codex Hugging Face plugin; continue other plugins."
+    echo "  --github-plugin ID   Select an exact Codex GitHub plugin ID (default: github@openai-curated)."
 }
 
 log() {
@@ -138,40 +147,91 @@ install_bundled_skill() {
 }
 
 codex_plugin_installed() {
-    codex plugin list --json 2>/dev/null |
-        grep -F "\"pluginId\": \"$1\"" >/dev/null
+    local plugin
+    for plugin in "${CODEX_INSTALLED_PLUGINS[@]}"; do
+        [[ "${plugin}" != "$1" ]] || return 0
+    done
+    return 1
+}
+
+preflight_codex_plugins() {
+    require_command "${PYTHON_COMMAND}"
+    local record url commit destination snapshot kind identifier plugin_snapshot marketplace_snapshot
+    local arguments=()
+    record="$(source_record i-have-adhd)"
+    [[ -n "${record}" ]] || fail "source manifest entry not found: i-have-adhd"
+    IFS=$'\t' read -r url commit destination <<<"${record}"
+    CODEX_ADHD_PATH="${SOURCE_ROOT}/${destination}"
+    [[ "${SKIP_HUGGING_FACE}" != true ]] || arguments+=(--skip-hugging-face)
+    if prefer_nvidia i-have-adhd; then
+        arguments+=(--skip-adhd)
+    fi
+    plugin_snapshot="$(codex plugin list --available --json)" ||
+        fail "codex plugin list --available --json failed; check the CLI version, network and account, then retry. No installation was started."
+    marketplace_snapshot="$(codex plugin marketplace list --json)" ||
+        fail "codex plugin marketplace list --json failed; check the CLI version, network and account, then retry. No installation was started."
+    snapshot="$(printf '%s\036%s' "${plugin_snapshot}" "${marketplace_snapshot}" |
+        "${PYTHON_COMMAND}" "${BUNDLE_ROOT}/scripts/codex_plugins.py" \
+        preflight --adhd-source "${CODEX_ADHD_PATH}" --github-plugin "${CODEX_GITHUB_PLUGIN}" \
+        "${arguments[@]}")" || exit 1
+    while IFS=$'\t' read -r kind identifier; do
+        case "${kind}" in
+            plugin) CODEX_INSTALLED_PLUGINS+=("${identifier}") ;;
+            marketplace) CODEX_MARKETPLACES+=("${identifier}") ;;
+        esac
+    done <<<"${snapshot}"
+    log "ok: Codex plugin preflight (${MODE})"
+    if [[ "${SKIP_HUGGING_FACE}" == true ]]; then
+        log "skip: hugging-face@openai-curated (--skip-hugging-face); other plugins remain selected"
+    fi
+}
+
+prepare_codex_sources() {
+    ensure_repo agent-skills CODEX_AGENT_SKILLS_PATH
+    if ! prefer_nvidia i-have-adhd; then
+        ensure_repo i-have-adhd CODEX_ADHD_PATH
+        if [[ "${MODE}" == apply || -e "${CODEX_ADHD_PATH}" ]]; then
+            "${PYTHON_COMMAND}" "${BUNDLE_ROOT}/scripts/codex_plugins.py" \
+                validate-local "${CODEX_ADHD_PATH}"
+        else
+            log "[dry-run] validate local i-have-adhd plugin after fetching its pinned source, before installing skills"
+        fi
+    fi
 }
 
 ensure_codex_plugin() {
     local plugin_id="$1"
-    if [[ "${MODE}" == "dry-run" ]]; then
-        run codex plugin add "${plugin_id}"
-        return
-    fi
     if codex_plugin_installed "${plugin_id}"; then
         log "ok: Codex plugin already installed: ${plugin_id}"
         return
     fi
-    run codex plugin add "${plugin_id}"
+    run codex plugin add "${plugin_id}" ||
+        fail "Codex plugin installation failed: ${plugin_id}. Earlier successful steps were preserved; fix the reported error and rerun with the same options to continue."
+    if [[ "${MODE}" == apply ]]; then
+        CODEX_INSTALLED_PLUGINS+=("${plugin_id}")
+    fi
 }
 
 codex_marketplace_installed() {
-    codex plugin marketplace list --json 2>/dev/null |
-        grep -F "\"name\": \"$1\"" >/dev/null
+    local marketplace
+    for marketplace in "${CODEX_MARKETPLACES[@]}"; do
+        [[ "${marketplace}" != "$1" ]] || return 0
+    done
+    return 1
 }
 
 ensure_codex_marketplace() {
     local marketplace_name="$1"
     local marketplace_source="$2"
-    if [[ "${MODE}" == "dry-run" ]]; then
-        run codex plugin marketplace add "${marketplace_source}"
-        return
-    fi
     if codex_marketplace_installed "${marketplace_name}"; then
         log "ok: Codex marketplace already configured: ${marketplace_name}"
         return
     fi
-    run codex plugin marketplace add "${marketplace_source}"
+    run codex plugin marketplace add "${marketplace_source}" ||
+        fail "Codex marketplace registration failed: ${marketplace_name}. Earlier successful steps were preserved; fix the reported error and rerun with the same options to continue."
+    if [[ "${MODE}" == apply ]]; then
+        CODEX_MARKETPLACES+=("${marketplace_name}")
+    fi
 }
 
 claude_plugin_installed() {
@@ -270,14 +330,7 @@ ensure_claude_agent_skills() {
 }
 
 install_codex() {
-    local agent_skills_path adhd_path skill_name
-    require_command codex
-    require_command git
-
-    ensure_repo agent-skills agent_skills_path
-    if ! prefer_nvidia i-have-adhd; then
-        ensure_repo i-have-adhd adhd_path
-    fi
+    local skill_name
 
     while IFS= read -r skill_name; do
         [[ -n "${skill_name}" ]] || continue
@@ -285,16 +338,18 @@ install_codex() {
             continue
         fi
         ensure_symlink \
-            "${agent_skills_path}/skills/${skill_name}" \
+            "${CODEX_AGENT_SKILLS_PATH}/skills/${skill_name}" \
             "${CODEX_CONFIG_ROOT}/skills/${skill_name}"
     done <"${BUNDLE_ROOT}/manifests/agent-skills.txt"
 
     install_bundled_skill karpathy-guidelines "${CODEX_CONFIG_ROOT}"
     install_bundled_skill backend-api-contracts "${CODEX_CONFIG_ROOT}"
-    ensure_codex_plugin github@openai-curated
-    ensure_codex_plugin hugging-face@openai-curated
+    ensure_codex_plugin "${CODEX_GITHUB_PLUGIN}"
+    if [[ "${SKIP_HUGGING_FACE}" != true ]]; then
+        ensure_codex_plugin hugging-face@openai-curated
+    fi
     if ! skip_baseline_skill i-have-adhd; then
-        ensure_codex_marketplace i-have-adhd "${adhd_path}"
+        ensure_codex_marketplace i-have-adhd "${CODEX_ADHD_PATH}"
         ensure_codex_plugin i-have-adhd@i-have-adhd
     fi
 }
@@ -341,6 +396,17 @@ while [[ $# -gt 0 ]]; do
             WITH_NVIDIA=false
             shift
             ;;
+        --skip-hugging-face)
+            SKIP_HUGGING_FACE=true
+            shift
+            ;;
+        --github-plugin)
+            [[ $# -ge 2 && "$2" != --* ]] || fail "--github-plugin requires a plugin@marketplace value"
+            CODEX_GITHUB_PLUGIN="$2"
+            [[ "${CODEX_GITHUB_PLUGIN}" =~ ^github@[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] ||
+                fail "--github-plugin requires an exact github@marketplace ID"
+            shift 2
+            ;;
         -h|--help)
             usage
             exit 0
@@ -358,6 +424,9 @@ done
 
 require_command "${TARGET}"
 require_command git
+if [[ "${TARGET}" == codex ]]; then
+    preflight_codex_plugins
+fi
 if prefer_nvidia i-have-adhd; then
     if { [[ "${TARGET}" == codex ]] && codex_plugin_installed i-have-adhd@i-have-adhd; } ||
         { [[ "${TARGET}" == claude ]] && claude_plugin_installed i-have-adhd@i-have-adhd; }; then
@@ -370,6 +439,9 @@ if [[ "${TARGET}" == claude ]] && claude_agent_skills_overlap; then
             fail "existing Claude plugin ${plugin_id} includes skills preferred from NVIDIA; remove it explicitly or use --without-nvidia. No existing plugin was changed."
         fi
     done
+fi
+if [[ "${TARGET}" == codex ]]; then
+    prepare_codex_sources
 fi
 if [[ "${WITH_NVIDIA}" == true ]]; then
     bash "${BUNDLE_ROOT}/install-nvidia.sh" --target "${TARGET}" "--${MODE}"

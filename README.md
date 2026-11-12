@@ -36,7 +36,7 @@
 <a id="prerequisites"></a>
 ## 每台新設備的準備工作
 
-完整安裝 Codex skills 需要 **Git、Bash 5 與 Codex CLI**。只安裝到 Codex 不需要 Claude Code。Bash scripts 使用 associative arrays 等功能，請使用 Bash 5；[GNU Bash arrays 手冊](https://www.gnu.org/software/bash/manual/html_node/Arrays.html) 說明 `declare -A` 的用途。
+完整安裝 Codex skills 需要 **Git、Bash 5、Python 3 與 Codex CLI**。只安裝到 Codex 不需要 Claude Code。Bash scripts 使用 associative arrays 等功能，請使用 Bash 5；[GNU Bash arrays 手冊](https://www.gnu.org/software/bash/manual/html_node/Arrays.html) 說明 `declare -A` 的用途。
 
 | 項目 | 何時需要 | 官方安裝／說明 |
 |---|---|---|
@@ -44,7 +44,7 @@
 | Codex CLI | `install-codex.sh`，即使平常使用 IDE extension 仍需 CLI 執行 plugin 安裝 | [OpenAI Codex CLI](https://learn.chatgpt.com/docs/codex/cli) |
 | Bash 5 | 完整 Bash bootstrap | Windows 用 [Git Bash](https://gitforwindows.org/)；macOS 見下方 Homebrew 步驟 |
 | Claude Code CLI | 只有 `install-claude.sh`／`install-all.sh` 需要 | [Claude Code 官方安裝](https://code.claude.com/docs/en/setup) |
-| Python 3 | `list-skills.sh` 與 Python 測試；不是 skills 安裝的必要條件 | [Python downloads](https://www.python.org/downloads/) |
+| Python 3 | Codex bootstrap 的 plugin JSON 預檢、`list-skills.sh` 與 Python 測試；Claude 與 NVIDIA-only 安裝不需要 | [Python downloads](https://www.python.org/downloads/) |
 | `rg` | 開發者執行 `verify.sh`／完整測試 | [ripgrep 官方專案](https://github.com/BurntSushi/ripgrep) |
 
 安裝 Codex CLI 請依官方頁面選擇作業系統的安裝方式。每台設備啟動一次 `codex` 完成登入，然後在**即將用來安裝的同一個 terminal** 檢查：
@@ -52,12 +52,15 @@
 ```bash
 git --version
 bash --version
+python3 --version
 codex --version
 codex plugin --help
 codex plugin marketplace --help
 ```
 
 若找不到 `codex`，先修正 CLI 的安裝與 `PATH`，不要以另一個使用者或不同 Codex profile 繼續。若沒有 `plugin` subcommand，先依 [OpenAI CLI reference](https://learn.chatgpt.com/docs/cli/reference#codex-plugin) 確認／更新相容版本。Scripts 不直接編輯 `config.toml`；plugin 的安裝與設定由 Codex CLI 管理。
+
+若 Python 命令名稱是 `python`，可用 `PYTHON_COMMAND=python ./install-codex.sh --dry-run` 指定；正式安裝與後續重跑使用相同設定。
 
 登入憑證應留在各設備的 credential store。不要把整個 `~/.codex` 或 `~/.claude` 複製進此 repository；官方 [Authentication](https://learn.chatgpt.com/docs/auth) 說明本機登入資料的儲存方式。
 
@@ -213,6 +216,7 @@ bash --version
 | 需求 | 預覽 | 明確安裝 |
 |---|---|---|
 | Codex 全部 444 | `./install-codex.sh --dry-run` | `./install-codex.sh --apply` |
+| Codex 全部 444，略過 Hugging Face plugin | `./install-codex.sh --skip-hugging-face --dry-run` | `./install-codex.sh --skip-hugging-face --apply` |
 | Claude Code 全部 444 | `./install-claude.sh --dry-run` | `./install-claude.sh --apply` |
 | Codex 與 Claude Code | `./install-all.sh --dry-run` | `./install-all.sh --apply` |
 | Codex 原有 27 個通用 skills | `./install-codex.sh --without-nvidia --dry-run` | `./install-codex.sh --without-nvidia --apply` |
@@ -220,6 +224,33 @@ bash --version
 | 兩個 agent 只裝 NVIDIA | `bash ./install-nvidia.sh --target both --dry-run` | `bash ./install-nvidia.sh --target both --apply` |
 
 `--with-nvidia` 保留為相容旗標，與目前預設相同。`install-all.sh` 需要同時有 `codex` 與 `claude` CLI；只用 Codex 就使用 `install-codex.sh`。
+
+### Codex plugin 預檢與選項
+
+Codex bootstrap 在 clone 來源、安裝 NVIDIA／通用 skills 或修改 plugin 設定前，先讀取 `codex plugin list --available --json` 與 `codex plugin marketplace list --json`。預檢依完整 `pluginId` 區分已安裝與可安裝的項目；已安裝者不重複 `add`，dry-run 也會反映此狀態，且不要求它的來源出現在 marketplace 清單中。尚未安裝者必須同時出現在可用清單，且其 marketplace 已存在。查詢失敗、JSON 無效或缺少必要項目時會先停止。
+
+預設仍包含 `hugging-face@openai-curated`。若這個組合在目前環境不可用，或已透過其他整合使用 Hugging Face，可明確加上 `--skip-hugging-face`，略過它的預檢與安裝，並繼續 GitHub 和 `i-have-adhd`。此旗標可與 `--without-nvidia` 合用；也可傳給 `install-all.sh`，只影響其中的 Codex 階段，Claude 階段接受但不使用它。
+
+可先查看當前 CLI 的清單，核對確切名稱、來源與已安裝狀態：
+
+```bash
+codex plugin list --available --json
+codex plugin marketplace list --json
+```
+
+其他整合或快取中出現 `huggingface`，不代表它與 `hugging-face@openai-curated` 相同，也不代表快取目錄名能直接當 CLI marketplace 使用。安裝器不自動猜測替代識別字。
+
+GitHub 預設為 `github@openai-curated`。若 CLI 清單確認你的完整識別字是其他來源，可用 `--github-plugin <plugin@marketplace>` 明確指定；該值會同時用於預檢和安裝，不會自動替換。同一名稱在不同 marketplace 的項目分別檢查，cache 或舊設定存在不等於當前 CLI 已安裝。
+
+例如，目前設備若已確認安裝 `github@openai-curated-remote`，可沿用它並略過 Hugging Face，先預覽續裝計畫：
+
+```bash
+./install-codex.sh --github-plugin github@openai-curated-remote --skip-hugging-face --dry-run
+```
+
+確認預覽後，才由你決定是否把 `--dry-run` 改成 `--apply`，並保留相同 profile、來源與其他旗標。`--github-plugin` 也可傳給 `install-all.sh`，只影響 Codex 階段。
+
+`i-have-adhd` 則由固定 SHA 的本機 checkout 提供。已有來源時先驗證其 marketplace、plugin manifest 與 skill；首次取得來源後會在安裝 skills 前驗證，再按計畫註冊 marketplace。因此新設備不必事先已有 `i-have-adhd` marketplace；dry-run 若尚無來源，會把本機來源驗證留到 apply 取得來源後。
 
 安裝位置如下；沒有設定環境變數時才使用預設：
 
@@ -262,7 +293,7 @@ codex plugin list
 codex plugin marketplace list
 ```
 
-預期有 `github@openai-curated`、`hugging-face@openai-curated` 與 `i-have-adhd@i-have-adhd`。對需要帳號的 connector，仍須在新設備重新授權；skill 檔案存在不代表服務已授權。Plugin 命令依據：[OpenAI CLI reference](https://learn.chatgpt.com/docs/cli/reference#codex-plugin)。
+預期有 `github@openai-curated`、`hugging-face@openai-curated` 與 `i-have-adhd@i-have-adhd`；使用 `--github-plugin` 時第一項改為你選定的完整 ID，使用 `--skip-hugging-face` 時不要求第二項。對需要帳號的 connector，仍須在新設備重新授權；skill 檔案存在不代表服務已授權。Plugin 命令依據：[OpenAI CLI reference](https://learn.chatgpt.com/docs/cli/reference#codex-plugin)。
 
 開啟新的 Codex session，在 CLI／IDE extension 輸入 `/skills` 或 `$` 選擇技能，例如 `$deepstream-dev`。如新裝內容尚未出現，重新啟動 Codex。[OpenAI skills 說明](https://learn.chatgpt.com/docs/build-skills#how-chatgpt-and-codex-use-skills)
 
@@ -325,10 +356,11 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 ### 重跑與停止條件
 
 - 預設 dry-run；只有明確的 `--apply`／PowerShell `-Apply` 修改使用者環境。
+- Codex 遠端 plugin 預檢先於來源下載與 skills 安裝；缺少指定 plugin、查詢失敗或 JSON 無效時先停止。`--skip-hugging-face` 只略過 Hugging Face，不略過 GitHub 或 `i-have-adhd`。
 - NVIDIA 入口先檢查選定 targets 的來源、授權與目的地；同內容 NVIDIA copies／同來源 Bash links 可重跑，差異不覆寫。
 - 通用技能的 symlink 也須指向原來源；bundled copies 須內容相同。既有 Claude plugin 不會被此 bootstrap 自動 update。
 - source checkout 不在固定 SHA，或 NVIDIA 已追蹤的 skill／license 檔案被修改時會停止；不執行 reset、pull 或強制切換。
-- 完整 bootstrap 按階段執行；若通用技能或 plugin 階段失敗，先前已成功的 NVIDIA 安裝可能仍保留。`install-all.sh` 也不會回滾前一個 agent。請處理明確錯誤後再重跑。
+- 預檢通過後，下載、授權或實際 plugin 安裝仍可能失敗。完整 bootstrap 按階段執行，不回滾先前成功項目；`install-all.sh` 也不回滾前一個 agent。處理錯誤後用相同 profile、來源與旗標重跑，已安裝的 Codex plugins 會跳過，skills 沿用既有內容比較。
 - 不要刪除或搬動 linked source。也不要用另一個帳號或不同 `HOME` 重跑，期待它更新原帳號的安裝。
 
 ### 常見問題
@@ -336,6 +368,7 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 | 現象 | 處理方式 |
 |---|---|
 | `codex: command not found`／沒有 `plugin` | 在當前 terminal 安裝或更新相容 Codex CLI，確認 `PATH`，再重跑 dry-run |
+| `python3` 找不到 | 安裝 Python 3，或用 `PYTHON_COMMAND=python` 指向可用的 Python 3；Codex plugin 預檢不會自動略過 |
 | Bash arrays／`[[ -v ]]` 語法錯誤 | 使用 Bash 5；macOS 同時調整 `PATH` 讓子腳本找到新版 |
 | Windows symbolic link 權限失敗 | 確認 Developer Mode、檔案系統與 native symlink 設定；無法啟用時選 PowerShell NVIDIA-only 或 WSL |
 | 目的地已有不同 skill／link | 停止，人工比較來源與內容；自行備份、決定遷移方式後再重跑，安裝器不代刪 |
@@ -343,6 +376,9 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 | 安裝成功但 `/skills` 看不到 | 確認實際 client／profile、官方 discovery 路徑與 `SKILL.md`，參考上方相容處理並重啟 |
 | `/skills` 顯示數量與 444 不同 | 分清 portable manifest、plugins、系統技能與 client context budget；以 manifest 與逐項來源核對 |
 | Plugin marketplace 或授權失敗 | 檢查 network、帳號與 marketplace 名稱；不要把登入資料寫進 manifest，先依錯誤訊息處理 |
+| 找不到 `hugging-face@openai-curated` | 核對可用清單；需要略過時，用相同來源與 profile 加上 `--skip-hugging-face` 先預覽，再 apply，不必刪除已裝好的 skills |
+| GitHub 的 CLI 識別字與預設不同 | 從 CLI 清單核對完整 ID，用 `--github-plugin <plugin@marketplace>` 明確選擇；已安裝的確切項目會跳過，安裝器不從 cache 猜測來源 |
+| Plugin list 命令失敗或回傳無效 JSON | 確認登入、網路與 CLI 是否支援上述 JSON 查詢，處理後重跑；安裝器不把查詢錯誤當作「尚未安裝」 |
 
 ### 更新 portable 專案與上游版本
 
@@ -355,7 +391,7 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 3. 同步本文與 [完整目錄](./docs/skill-catalog.md) 的名稱、摘要、固定版本 citation 與數量。
 4. 執行檢查與 dry-run。遇舊來源／舊 copies 差異，先人工規劃遷移，不自動覆寫。
 
-完整安裝的 GitHub／Hugging Face plugins 從 marketplace 取得；[codex-plugins.txt](./manifests/codex-plugins.txt) 的 `observed_version` 是記錄值，scripts 沒有把遠端 plugin 內容鎖定到這個版本。因此 **skills source SHA 可固定重建，marketplace plugins 不保證逐位元同版本**。
+完整安裝的 GitHub／Hugging Face plugins 從 marketplace 取得；[codex-plugins.txt](./manifests/codex-plugins.txt) 只記錄 plugin IDs、來源與 `observed_version`，不是 bootstrap 的執行輸入，單改此檔不會變更安裝項目。Scripts 沒有把遠端 plugin 內容鎖定到觀測版本。因此 **skills source SHA 可固定重建，marketplace plugins 不保證逐位元同版本**。
 
 ### 開發者驗證
 

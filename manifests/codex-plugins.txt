@@ -1,4 +1,7 @@
 # plugin_id	observed_version	source
+# Observation record only; default plugin IDs are defined in scripts/bootstrap.sh and scripts/codex_plugins.py.
+# Use --github-plugin <plugin@marketplace> to select an explicit GitHub plugin ID verified against the current CLI catalog.
+# hugging-face@openai-curated can be omitted with --skip-hugging-face; check the current CLI catalog before selecting a replacement.
 github@openai-curated	11c74d6b	openai-curated
 hugging-face@openai-curated	11c74d6b	openai-curated
 i-have-adhd@i-have-adhd	0.1.0	https://github.com/ayghri/i-have-adhd.git

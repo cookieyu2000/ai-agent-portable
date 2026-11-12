@@ -24,12 +24,21 @@ commit="$(awk -F '\t' '$1 == "nvidia-skills" { print $3 }' "${ROOT}/manifests/so
 mkdir -p "${TEMP}/bin" "${TEMP}/bundle/scripts"
 cp "${ROOT}/install-nvidia.sh" "${TEMP}/bundle/"
 cp "${ROOT}/scripts/bootstrap.sh" "${TEMP}/bundle/scripts/"
+cp "${ROOT}/scripts/codex_plugins.py" "${TEMP}/bundle/scripts/"
 cp -R "${ROOT}/manifests" "${ROOT}/skills" "${ROOT}/claude-marketplaces" "${TEMP}/bundle/"
 cat >"${TEMP}/bin/codex" <<'EOF'
 #!/usr/bin/env bash
-if [[ "${FAKE_ADHD_PLUGIN:-false}" == true && "$*" == 'plugin list --json' ]]; then
-    echo '{"pluginId": "i-have-adhd@i-have-adhd"}'
-fi
+case "$*" in
+    'plugin list --available --json')
+        installed=''
+        if [[ "${FAKE_ADHD_PLUGIN:-false}" == true ]]; then
+            installed='{"pluginId":"i-have-adhd@i-have-adhd","installed":true}'
+        fi
+        printf '{"installed":[%s],"available":[{"pluginId":"github@openai-curated","installed":false},{"pluginId":"hugging-face@openai-curated","installed":false}]}\n' "${installed}" ;;
+    'plugin marketplace list --json')
+        printf '%s\n' '{"marketplaces":[{"name":"openai-curated"}]}' ;;
+    *) printf 'unexpected fake Codex invocation: %s\n' "$*" >&2; exit 1 ;;
+esac
 EOF
 cat >"${TEMP}/bin/claude" <<'EOF'
 #!/usr/bin/env bash

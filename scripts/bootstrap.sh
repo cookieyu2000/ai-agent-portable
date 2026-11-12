@@ -146,6 +146,17 @@ install_bundled_skill() {
     run cp -R "${source_path}" "${destination_path}"
 }
 
+install_hallmark() {
+    if skip_baseline_skill hallmark; then
+        return
+    fi
+    PYTHON_COMMAND="${PYTHON_COMMAND}" "${BUNDLE_ROOT}/install-optional.sh" \
+        --package hallmark --target "${TARGET}" "--${MODE}" \
+        --source-root "${SOURCE_ROOT}" \
+        --codex-home "${CODEX_CONFIG_ROOT}" \
+        --claude-home "${CLAUDE_CONFIG_ROOT}"
+}
+
 codex_plugin_installed() {
     local plugin
     for plugin in "${CODEX_INSTALLED_PLUGINS[@]}"; do
@@ -424,6 +435,7 @@ done
 
 require_command "${TARGET}"
 require_command git
+require_command "${PYTHON_COMMAND}"
 if [[ "${TARGET}" == codex ]]; then
     preflight_codex_plugins
 fi
@@ -443,6 +455,7 @@ fi
 if [[ "${TARGET}" == codex ]]; then
     prepare_codex_sources
 fi
+install_hallmark
 if [[ "${WITH_NVIDIA}" == true ]]; then
     bash "${BUNDLE_ROOT}/install-nvidia.sh" --target "${TARGET}" "--${MODE}"
 fi

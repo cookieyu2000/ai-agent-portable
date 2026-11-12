@@ -1,12 +1,12 @@
 # 完整 skill 目錄與來源
 
-本目錄依本專案的 [common-skills.txt](../manifests/common-skills.txt)、[agent-skills.txt](../manifests/agent-skills.txt)、[nvidia-skills.txt](../manifests/nvidia-skills.txt) 與 [sources.tsv](../manifests/sources.tsv) 整理：**27 個通用 skills + 417 個 NVIDIA skills = 444 個不重複的安裝項目**。這個數字不包含 plugins 額外提供的 skills、Codex 內建 skills 或舊 [SKILLS.md](../SKILLS.md) 的環境盤點快照。
+本目錄依本專案的 [common-skills.txt](../manifests/common-skills.txt)、[agent-skills.txt](../manifests/agent-skills.txt)、[nvidia-skills.txt](../manifests/nvidia-skills.txt)、[sources.tsv](../manifests/sources.tsv) 與 [optional-sources.json](../manifests/optional-sources.json) 整理：**28 個通用 skills（含 Hallmark）+ 417 個 NVIDIA skills = 445 個不重複的安裝項目**。Codex 與 Claude Code 完整安裝各包含這 445 項；plugins 額外提供的 skills、agent 內建 skills 與 Claude commands 另計，舊 [SKILLS.md](../SKILLS.md) 仍為環境盤點快照。
 
 每一列的 identifier 是 manifest 的目錄名稱；若原始 SKILL.md 的 YAML `name` 不同，同行加註。安裝路徑與精確指定技能時須區分這兩者。下列每項外部來源均固定到本專案鎖定的 commit，不會因上游 main 改動而指向別的版本。
 
 用途文字是本專案整理的繁體中文摘要；完整適用範圍、前置條件、限制與執行規則以每列引用的 SKILL.md 為準。若 NVIDIA skill 涵蓋目前任務，同名或功能雷同時優先選 NVIDIA；通用工程 skills 補足其未涵蓋的部分。這項選用規則不會刪除其他 skill，也不會把產品限定流程套用到範圍外的工作。
 
-## 通用基線（27）
+## 通用基線（28）
 
 ### addyosmani/agent-skills（24）
 
@@ -46,6 +46,14 @@
 | Identifier | 用途摘要 | 原始來源 citation |
 |---|---|---|
 | `i-have-adhd` | 調整回覆順序、步驟與資訊密度，支援需要 ADHD 友善輸出的使用者。 | [SKILL.md](https://github.com/ayghri/i-have-adhd/blob/07684c4ab625dd7d1ea6e99e065f60bc0ac6a1ba/skills/i-have-adhd/SKILL.md) |
+
+### Nutlope/hallmark（1）
+
+Hallmark 2.0.0；固定版本 `407fa689f4a276f2fd389208d271d0fef08f5058`，來源由共用的 [optional-sources.json](../manifests/optional-sources.json) 管理，已納入預設完整安裝。授權為 [MIT](https://github.com/Nutlope/hallmark/blob/407fa689f4a276f2fd389208d271d0fef08f5058/skills/hallmark/LICENSE)；Copyright (c) 2026 Hallmark contributors。
+
+| Identifier | 用途摘要 | 原始來源 citation |
+|---|---|---|
+| `hallmark` | 為新網站與頁面規劃視覺方向、主題及設計檢查；既有設計的稽核與重設計須明確指定 Hallmark。 | [SKILL.md](https://github.com/Nutlope/hallmark/blob/407fa689f4a276f2fd389208d271d0fef08f5058/skills/hallmark/SKILL.md) |
 
 ### 本專案 bundled skills（2）
 

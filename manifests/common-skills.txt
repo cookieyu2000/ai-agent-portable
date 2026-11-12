@@ -12,6 +12,7 @@ documentation-and-adrs
 doubt-driven-development
 frontend-ui-engineering
 git-workflow-and-versioning
+hallmark
 idea-refine
 incremental-implementation
 interview-me

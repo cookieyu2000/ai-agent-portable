@@ -1,38 +1,52 @@
-# 選配技能與遠端辦公工具
+# Hallmark 獨立安裝與 Codync 遠端辦公工具
 
-本頁實際可安裝的項目是 **Hallmark** 與 **Codync**。原有 444 個基線 skills 與
-`install-codex.sh`／`install-claude.sh` 的行為不變；Hallmark 另加 1 個選配 skill，
-Codync 是獨立執行工具，不計入 skill 數量。
+**Hallmark 已納入預設完整安裝**：`install-codex.sh`／`install-claude.sh` 各安裝
+445 個 portable skills，包含 NVIDIA 417 與通用基線 28；Hallmark 是其中 1 個。
+`install-all.sh` 會替兩個 agent 各安裝一份，`--without-nvidia` 也包含 Hallmark。
+本頁保留獨立入口供舊環境補裝；已安裝相同內容的 Hallmark copy 可直接重跑。
+**Codync 仍是選配的獨立執行工具**，不計入 skill 數量，也不會隨完整安裝下載或啟動。
 
 | 套件 | 固定版本 | 安裝結果 | 下一步 |
 |---|---|---|---|
-| Hallmark | 2.0.0，固定 Git SHA | 將完整 skill、references、scripts 與授權複製到選定 agent | [設計與瀏覽器驗證](hallmark.md) |
+| Hallmark | 2.0.0，固定 Git SHA | 預設完整安裝包含；亦可獨立複製完整 skill、references、scripts 與授權到選定 agent | [設計與瀏覽器驗證](hallmark.md) |
 | Codync | 2.43.1，固定 release 與 SHA256 | 將 host binary 與授權放到獨立版本目錄 | [手機配對、進度與排程](codync.md) |
 
 來源、版本、平台與下載 checksum 由
 [optional-sources.json](../manifests/optional-sources.json) 管理。
+這份共用 manifest 保留原檔名；Hallmark 的固定 commit 為
+`407fa689f4a276f2fd389208d271d0fef08f5058`，不因納入預設安裝而改用浮動來源。
 安裝器不呼叫上游安裝腳本，不啟動背景服務、不配對手機，也不設定 agent 登入、
 排程、hooks 或自動更新。這些步驟由各工作主機依 Codync 指南明確啟用。
 
 ## Linux／WSL／macOS
 
-需要 Python 3.10+、Git 與網路。從 repository 根目錄執行：
+需要 Python 3.10+、Git 與下載來源所需的網路；Python 可透過 `PYTHON_COMMAND`
+指定，例如 `PYTHON_COMMAND=python`。從 repository 根目錄執行：
 
 ```bash
-# 預覽兩項：不連網、不建立檔案
-./install-optional.sh --package all --target codex --dry-run
+# 完整安裝後只需加裝 Codync：先預覽，不連網、不建立檔案
+./install-optional.sh --package codync --target codex --dry-run
 
-# 安裝 Hallmark skill 與 Codync host
-./install-optional.sh --package all --target codex --apply
+# 安裝 Codync host，不啟動服務
+./install-optional.sh --package codync --target codex --apply
 ```
 
-只裝一項時改用 `--package hallmark` 或 `--package codync`。
+舊環境只需補裝 Hallmark：
+
+```bash
+./install-optional.sh --package hallmark --target codex --dry-run
+./install-optional.sh --package hallmark --target codex --apply
+```
+
+需要兩項時可使用 `--package all`；這個獨立入口的 `all` 指 Hallmark 與 Codync，
+不等於安裝完整 445 個 skills，也不會自動啟動 Codync。
 Hallmark 支援 `--target codex|claude|both`；Codync host 每個使用者安裝一份，
 不因 target=both 啟動兩個服務。
 
 ## Windows PowerShell
 
-原生 Windows 可安裝 Hallmark，需 Python 3.10+ 與 Git：
+Windows Git Bash 的完整安裝已包含 Hallmark。原生 PowerShell 的 NVIDIA-only
+入口仍只安裝 417 個 NVIDIA skills；要補 Hallmark，準備 Python 3.10+ 與 Git 後執行：
 
 ```powershell
 .\install-optional.ps1 -Package Hallmark -Target Codex

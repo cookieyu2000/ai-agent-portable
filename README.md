@@ -4,9 +4,9 @@
 
 在不同設備上重建 Codex／Claude Code 的 skills 與 plugins。此 repository 保存可攜技能、固定來源 manifest、安裝 scripts 與文件；外部技能在明確 apply 時取得。登入、connectors 授權與個人設定由每台設備自行處理。
 
-另提供 **Hallmark 網頁設計技能 + Codync 手機辦公／進度／排程**的[選配安裝](./docs/optional-integrations.md)。Hallmark 是額外 1 個 skill；Codync 是獨立 host 工具，兩者不改變下方 444 個基線清單。Linux／WSL／macOS 可執行 `./install-optional.sh --package all --target codex --dry-run` 預覽，改成 `--apply` 才安裝；Windows PowerShell 的 Hallmark 與 Codync 桌面版路徑見選配指南。安裝完成後依 [Codync 指南](./docs/codync.md)啟用服務、配對手機及設定 `Asia/Taipei` 排程。
+完整安裝已包含 **Hallmark 網頁設計技能**；Codex 與 Claude Code 各安裝下方 **445 個 portable skills**。Hallmark 的設計與瀏覽器驗證見[使用指南](./docs/hallmark.md)。**Codync 手機辦公／進度／排程**仍是獨立的[選配工具](./docs/optional-integrations.md)，不計入 skills，也不會隨完整安裝下載或啟動。需要時另行安裝，再依 [Codync 指南](./docs/codync.md)啟用服務、配對手機及設定 `Asia/Taipei` 排程。
 
-目前固定的 portable 清單為 **444 個不重複 skills**：
+目前固定的 portable 清單為 **445 個不重複 skills**：
 
 | 來源 | 數量 | 安裝清單／來源 citation |
 |---|---:|---|
@@ -14,9 +14,10 @@
 | `addyosmani/agent-skills` | 24 | [manifest](./manifests/agent-skills.txt) · [固定版本來源](https://github.com/addyosmani/agent-skills/tree/7829ffd90d973b6325f5f12f1b1226dcace74443/skills) |
 | `i-have-adhd` | 1 | [固定版本來源](https://github.com/ayghri/i-have-adhd/tree/07684c4ab625dd7d1ea6e99e065f60bc0ac6a1ba) |
 | 本專案 bundled skills | 2 | [karpathy-guidelines](./skills/karpathy-guidelines/SKILL.md) · [backend-api-contracts](./skills/backend-api-contracts/SKILL.md) |
-| **合計** | **444** | NVIDIA 417 ＋ [通用基線 27](./manifests/common-skills.txt) |
+| Hallmark 網頁設計技能 | 1 | [固定來源 manifest](./manifests/optional-sources.json) · [2.0.0 固定版本來源](https://github.com/Nutlope/hallmark/tree/407fa689f4a276f2fd389208d271d0fef08f5058/skills/hallmark) |
+| **合計** | **445** | NVIDIA 417 ＋ [通用基線 28](./manifests/common-skills.txt) |
 
-全部名稱、用途摘要與逐項來源列於本文的[完整技能目錄](#skill-catalog)，亦可單獨閱讀 [docs/skill-catalog.md](./docs/skill-catalog.md)。這是安裝 manifest 的數量；Codex 內建技能、GitHub／Hugging Face plugins 的技能與 Claude commands 另計。[SKILLS.md](./SKILLS.md) 保留的是舊環境 82 項盤點，不是目前 444 項安裝清單。
+全部名稱、用途摘要與逐項來源列於本文的[完整技能目錄](#skill-catalog)，亦可單獨閱讀 [docs/skill-catalog.md](./docs/skill-catalog.md)。這是安裝 manifest 的數量；agent 內建技能、GitHub／Hugging Face plugins 額外提供的技能與 Claude commands 另計。[SKILLS.md](./SKILLS.md) 保留的是舊環境 82 項盤點，不是目前 445 項安裝清單。
 
 > 文件與官方安裝指引核對日期：2026-10-27。上游 skills 依固定 SHA 計數，不能用今天線上 catalog 的數量替代。此 repository 不自動 commit、push 或設定 remote。
 
@@ -29,17 +30,17 @@
 - [Linux／WSL：完整安裝到 Codex](#linux-wsl)
 - [macOS：完整安裝到 Codex](#macos)
 - [其他安裝組合與自訂位置](#options)
-- [Hallmark 與 Codync 選配安裝](./docs/optional-integrations.md)
+- [Hallmark 獨立補裝與 Codync 選配安裝](./docs/optional-integrations.md)
 - [安裝後驗證與 Codex 載入位置](#verification)
 - [NVIDIA 優先規則](#nvidia-first)
 - [更新、重跑與衝突處理](#maintenance)
 - [來源、版本與授權](#sources)
-- [完整技能目錄：444 個](#skill-catalog)
+- [完整技能目錄：445 個](#skill-catalog)
 
 <a id="prerequisites"></a>
 ## 每台新設備的準備工作
 
-完整安裝 Codex skills 需要 **Git、Bash 5、Python 3 與 Codex CLI**。只安裝到 Codex 不需要 Claude Code。Bash scripts 使用 associative arrays 等功能，請使用 Bash 5；[GNU Bash arrays 手冊](https://www.gnu.org/software/bash/manual/html_node/Arrays.html) 說明 `declare -A` 的用途。
+完整安裝需要 **Git、Bash 5、Python 3.10+ 與目標 agent CLI**；Codex 與 Claude Code 都需要 Python 安裝 Hallmark。只安裝到 Codex 不需要 Claude Code。Bash scripts 使用 associative arrays 等功能，請使用 Bash 5；[GNU Bash arrays 手冊](https://www.gnu.org/software/bash/manual/html_node/Arrays.html) 說明 `declare -A` 的用途。
 
 | 項目 | 何時需要 | 官方安裝／說明 |
 |---|---|---|
@@ -47,7 +48,7 @@
 | Codex CLI | `install-codex.sh`，即使平常使用 IDE extension 仍需 CLI 執行 plugin 安裝 | [OpenAI Codex CLI](https://learn.chatgpt.com/docs/codex/cli) |
 | Bash 5 | 完整 Bash bootstrap | Windows 用 [Git Bash](https://gitforwindows.org/)；macOS 見下方 Homebrew 步驟 |
 | Claude Code CLI | 只有 `install-claude.sh`／`install-all.sh` 需要 | [Claude Code 官方安裝](https://code.claude.com/docs/en/setup) |
-| Python 3 | Codex bootstrap 的 plugin JSON 預檢、`list-skills.sh` 與 Python 測試；Claude 與 NVIDIA-only 安裝不需要 | [Python downloads](https://www.python.org/downloads/) |
+| Python 3.10+ | Codex／Claude 完整安裝中的 Hallmark、Codex plugin JSON 預檢、`list-skills.sh` 與 Python 測試；NVIDIA-only 安裝不需要 | [Python downloads](https://www.python.org/downloads/) |
 | `rg` | 開發者執行 `verify.sh`／完整測試 | [ripgrep 官方專案](https://github.com/BurntSushi/ripgrep) |
 
 安裝 Codex CLI 請依官方頁面選擇作業系統的安裝方式。每台設備啟動一次 `codex` 完成登入，然後在**即將用來安裝的同一個 terminal** 檢查：
@@ -63,7 +64,7 @@ codex plugin marketplace --help
 
 若找不到 `codex`，先修正 CLI 的安裝與 `PATH`，不要以另一個使用者或不同 Codex profile 繼續。若沒有 `plugin` subcommand，先依 [OpenAI CLI reference](https://learn.chatgpt.com/docs/cli/reference#codex-plugin) 確認／更新相容版本。Scripts 不直接編輯 `config.toml`；plugin 的安裝與設定由 Codex CLI 管理。
 
-若 Python 命令名稱是 `python`，可用 `PYTHON_COMMAND=python ./install-codex.sh --dry-run` 指定；正式安裝與後續重跑使用相同設定。
+確認 Python 為 3.10 或更新版本。若命令名稱是 `python`，可用 `PYTHON_COMMAND=python ./install-codex.sh --dry-run` 指定；Claude 使用 `PYTHON_COMMAND=python ./install-claude.sh --dry-run`。正式安裝、Hallmark 獨立入口與後續重跑使用相同設定。
 
 登入憑證應留在各設備的 credential store。不要把整個 `~/.codex` 或 `~/.claude` 複製進此 repository；官方 [Authentication](https://learn.chatgpt.com/docs/auth) 說明本機登入資料的儲存方式。
 
@@ -77,7 +78,7 @@ git clone https://github.com/cookieyu2000/ai-agent-portable.git
 cd ai-agent-portable
 ```
 
-**Clone 只能取得已推送的內容。** 若原設備上的 417 項整合尚未發布，請先自行檢視、commit／push，再於新設備 clone；或直接把更新後的本專案目錄複製到新設備。不要把來源 checkout、plugin cache、sessions、history 或登入資料一起收進專案。
+**Clone 只能取得已推送的內容。** 若原設備上的完整整合尚未發布，請先自行檢視、commit／push，再於新設備 clone；或直接把更新後的本專案目錄複製到新設備。不要把來源 checkout、plugin cache、sessions、history 或登入資料一起收進專案。
 
 在開始前，確認新設備收到的是完整 417 項 NVIDIA 清單：
 
@@ -96,14 +97,14 @@ awk '/^[a-z0-9][a-z0-9-]*$/ { n++ } END { print n }' manifests/nvidia-skills.txt
 <a id="windows-full"></a>
 ## Windows：完整安裝到 Codex
 
-這條路徑安裝 **444 個 portable skills 與 Codex plugins**。使用 **Git Bash app**，不在 PowerShell 直接執行 `.sh`；PowerShell 裡的 `bash` 可能指向 WSL，並不代表 Git Bash。
+這條路徑安裝 **445 個 portable skills（包含 Hallmark）與 Codex plugins**。使用 **Git Bash app**，不在 PowerShell 直接執行 `.sh`；PowerShell 裡的 `bash` 可能指向 WSL，並不代表 Git Bash。
 
 ### 1. 準備 Git Bash 與 symbolic links
 
 1. 安裝 [Git for Windows](https://git-scm.com/install/windows)，從開始選單開啟 **Git Bash**。
 2. 在 Windows Settings 搜尋 **Developer Mode** 並啟用。若設備由組織管理且無法啟用，改用下方的 PowerShell NVIDIA-only 入口，或在 WSL 內安裝。
 3. 來源 checkout 與安裝目的地使用支援 Windows symbolic links 的檔案系統，例如 NTFS／ReFS；避免將 linked source 放在不支援連結的外接磁碟。
-4. 在 Git Bash 確認前述 `git`、Bash 5 與 `codex` 命令皆可使用。
+4. 在 Git Bash 確認前述 `git`、Bash 5、Python 3.10+ 與 `codex` 命令皆可使用。
 
 Git Bash 的 `ln -s` 預設可能改成複製；完整安裝命令使用 `MSYS=winsymlinks:nativestrict`，讓無法建立真正連結時直接報錯。依據：[Git for Windows symbolic links](https://gitforwindows.org/symbolic-links.html)、[MSYS2 symlinks](https://www.msys2.org/docs/symlinks/)、[Microsoft Developer Mode](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode)。
 
@@ -131,7 +132,7 @@ MSYS=winsymlinks:nativestrict ./install-codex.sh --apply
 <a id="windows-nvidia"></a>
 ## Windows：PowerShell 只安裝 NVIDIA
 
-如果目前只需要全部 NVIDIA skills，這條原生入口安裝 **417 個 NVIDIA skills**，使用完整目錄複本，不需要 Developer Mode、Bash、Node.js、npx 或 symbolic link 權限；需要 Git for Windows。這條入口不安裝 27 個通用 skills，也不安裝 Codex plugins。
+如果目前只需要全部 NVIDIA skills，這條原生入口安裝 **417 個 NVIDIA skills**，使用完整目錄複本，不需要 Developer Mode、Bash、Node.js、npx 或 symbolic link 權限；需要 Git for Windows。這條入口不安裝 28 個通用 skills（包含 Hallmark），也不安裝 Codex plugins。
 
 在專案目錄開啟 PowerShell 5.1+：
 
@@ -141,6 +142,15 @@ MSYS=winsymlinks:nativestrict ./install-codex.sh --apply
 ```
 
 第一條預覽；第二條才會 clone 固定來源與複製完整 skill 目錄。授權另保存至 `<CODEX_HOME>/licenses/nvidia-skills/<SHA>/`。
+
+若只想在 NVIDIA-only 之後補裝 Hallmark，先準備 Python 3.10+，再於同一個 PowerShell 執行：
+
+```powershell
+.\install-optional.ps1 -Package Hallmark -Target Codex
+.\install-optional.ps1 -Package Hallmark -Target Codex -Apply
+```
+
+這會合計安裝 418 個 skills；其餘通用 skills 與 plugins 仍需下方 Git Bash 流程補齊。
 
 若下載的 script 被標為來自網際網路，先檢視來源與內容；確認後可只解除這個檔案的封鎖，再執行上述命令：
 
@@ -166,26 +176,26 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-nvidia.ps1 -Ta
 .\install-nvidia.ps1 -Target Both -Apply
 ```
 
-若之後要補齊 Codex 的 27 個通用 skills 與 plugins，在**同一個 Windows 使用者、相同來源與 `CODEX_HOME`** 的 Git Bash，按[Windows 完整安裝](#windows-full)設定後執行：
+若之後要補齊 Codex 的 28 個通用 skills 與 plugins，在**同一個 Windows 使用者、相同來源與 `CODEX_HOME`** 的 Git Bash，按[Windows 完整安裝](#windows-full)設定後執行：
 
 ```bash
 MSYS=winsymlinks:nativestrict ./install-codex.sh --without-nvidia --dry-run
 MSYS=winsymlinks:nativestrict ./install-codex.sh --without-nvidia --apply
 ```
 
-這樣保留 NVIDIA 的 PowerShell copies，只補通用基線。不要反向用 PowerShell 入口覆蓋 Git Bash 建立的 NVIDIA links；原生安裝器遇到 reparse points 會停止。
+這樣保留 NVIDIA 的 PowerShell copies，補齊包含 Hallmark 的通用基線；已單獨安裝、內容相同的 Hallmark copy 可重跑。不要反向用 PowerShell 入口覆蓋 Git Bash 建立的 NVIDIA links；原生安裝器遇到 reparse points 會停止。
 
 <a id="linux-wsl"></a>
 ## Linux／WSL：完整安裝到 Codex
 
-先在該環境安裝 Git、Bash 5 與 Codex CLI，取得本專案，然後執行：
+先在該環境安裝 Git、Bash 5、Python 3.10+ 與 Codex CLI，取得本專案，然後執行：
 
 ```bash
 ./install-codex.sh --dry-run
 ./install-codex.sh --apply
 ```
 
-這會安裝全部 444 個 portable skills 與 Codex plugins。來源預設為 `~/src/ai-agent-sources/`；NVIDIA 與 `agent-skills` 使用連結，安裝後不可移除或隨意搬動來源目錄。
+這會安裝全部 445 個 portable skills（包含 Hallmark）與 Codex plugins。來源預設為 `~/src/ai-agent-sources/`；NVIDIA 與 `agent-skills` 使用連結，安裝後不可移除或隨意搬動來源目錄。Hallmark 使用完整目錄複本，不會自動安裝 Node.js、Puppeteer 或瀏覽器。
 
 **WSL 與 Windows 原生 Codex 分開看待。** 如果 Codex 在 WSL 內執行，就在該 WSL distribution、該 Linux 帳號安裝並登入 Codex；在 WSL 安裝的 skills 不等於已安裝到 Windows 使用者目錄。Windows 原生 Codex 則使用上方 Windows 步驟。官方說明見 [OpenAI WSL 指引](https://learn.chatgpt.com/docs/windows/wsl)。
 
@@ -202,7 +212,7 @@ bash --version
 
 請確認顯示 Bash 5。`brew --prefix bash` 同時適用 Apple Silicon 與 Intel，無須硬編碼 `/opt/homebrew` 或 `/usr/local`。來源：[Homebrew bash formula](https://formulae.brew.sh/formula/bash)、[Homebrew `--prefix`](https://docs.brew.sh/Manpage)。
 
-接著安裝／確認 Git 與 Codex CLI、取得本專案，再執行：
+接著安裝／確認 Git、Python 3.10+ 與 Codex CLI、取得本專案，再執行：
 
 ```bash
 ./install-codex.sh --dry-run
@@ -218,15 +228,17 @@ bash --version
 
 | 需求 | 預覽 | 明確安裝 |
 |---|---|---|
-| Codex 全部 444 | `./install-codex.sh --dry-run` | `./install-codex.sh --apply` |
-| Codex 全部 444，略過 Hugging Face plugin | `./install-codex.sh --skip-hugging-face --dry-run` | `./install-codex.sh --skip-hugging-face --apply` |
-| Claude Code 全部 444 | `./install-claude.sh --dry-run` | `./install-claude.sh --apply` |
+| Codex 全部 445 | `./install-codex.sh --dry-run` | `./install-codex.sh --apply` |
+| Codex 全部 445，略過 Hugging Face plugin | `./install-codex.sh --skip-hugging-face --dry-run` | `./install-codex.sh --skip-hugging-face --apply` |
+| Claude Code 全部 445 | `./install-claude.sh --dry-run` | `./install-claude.sh --apply` |
 | Codex 與 Claude Code | `./install-all.sh --dry-run` | `./install-all.sh --apply` |
-| Codex 原有 27 個通用 skills | `./install-codex.sh --without-nvidia --dry-run` | `./install-codex.sh --without-nvidia --apply` |
+| Codex 28 個通用 skills（含 Hallmark） | `./install-codex.sh --without-nvidia --dry-run` | `./install-codex.sh --without-nvidia --apply` |
 | 只裝 Codex 的 NVIDIA 417 | `bash ./install-nvidia.sh --target codex --dry-run` | `bash ./install-nvidia.sh --target codex --apply` |
 | 兩個 agent 只裝 NVIDIA | `bash ./install-nvidia.sh --target both --dry-run` | `bash ./install-nvidia.sh --target both --apply` |
 
 `--with-nvidia` 保留為相容旗標，與目前預設相同。`install-all.sh` 需要同時有 `codex` 與 `claude` CLI；只用 Codex 就使用 `install-codex.sh`。
+
+這三個完整入口與 `--without-nvidia` 都會自動透過共用安裝器安裝固定版本 Hallmark；不會安裝 Codync。舊環境只需補 Hallmark 時，仍可執行 `./install-optional.sh --package hallmark --target codex --dry-run`，確認後改為 `--apply`；Claude 改用 `--target claude`，兩者用 `--target both`。
 
 ### Codex plugin 預檢與選項
 
@@ -259,11 +271,12 @@ GitHub 預設為 `github@openai-curated`。若 CLI 清單確認你的完整識�
 
 | 變數／內容 | 預設位置 | 用途 |
 |---|---|---|
-| `AI_AGENT_SOURCE_ROOT` | `$HOME/src/ai-agent-sources` | 三個固定版本來源 checkout |
+| `AI_AGENT_SOURCE_ROOT` | `$HOME/src/ai-agent-sources` | NVIDIA、agent-skills、i-have-adhd 與 Hallmark 的固定版本來源 checkout |
 | `CODEX_HOME` | `$HOME/.codex` | 本專案 Codex skills、plugins 與 Codex profile |
 | `CLAUDE_CONFIG_DIR` | `$HOME/.claude` | Claude skills 與 plugin 設定 |
 | NVIDIA／agent-skills linked skills | `<CODEX_HOME>/skills/<directory>` | 完整目錄連結 |
 | bundled skills | `<CODEX_HOME>/skills/<name>` | 本專案的兩個完整複本 |
+| Hallmark | `<CODEX_HOME>/skills/hallmark`／`<CLAUDE_CONFIG_DIR>/skills/hallmark` | 完整目錄複本；來源為 `<AI_AGENT_SOURCE_ROOT>/hallmark-<SHA>/`，授權另存於各 profile 的 `licenses/hallmark/<SHA>/` |
 | `i-have-adhd` | Codex plugin 管理的位置 | 由 plugin 提供一個通用 skill |
 
 **所有 override 都使用絕對路徑**。Bash 自訂來源範例：
@@ -289,7 +302,7 @@ $env:CODEX_HOME = Join-Path $HOME '.codex'
 
 ### 檢查安裝器與 plugin 結果
 
-完整 Codex 入口成功時，會看到 NVIDIA catalog 與 Codex bootstrap 的完成訊息。接著檢查：
+完整 Codex 入口成功時，會看到 NVIDIA catalog、Hallmark 與 Codex bootstrap 的完成訊息。接著檢查：
 
 ```bash
 codex plugin list
@@ -298,7 +311,7 @@ codex plugin marketplace list
 
 預期有 `github@openai-curated`、`hugging-face@openai-curated` 與 `i-have-adhd@i-have-adhd`；使用 `--github-plugin` 時第一項改為你選定的完整 ID，使用 `--skip-hugging-face` 時不要求第二項。對需要帳號的 connector，仍須在新設備重新授權；skill 檔案存在不代表服務已授權。Plugin 命令依據：[OpenAI CLI reference](https://learn.chatgpt.com/docs/cli/reference#codex-plugin)。
 
-開啟新的 Codex session，在 CLI／IDE extension 輸入 `/skills` 或 `$` 選擇技能，例如 `$deepstream-dev`。如新裝內容尚未出現，重新啟動 Codex。[OpenAI skills 說明](https://learn.chatgpt.com/docs/build-skills#how-chatgpt-and-codex-use-skills)
+開啟新的 Codex session，在 CLI／IDE extension 輸入 `/skills` 或 `$` 選擇技能，例如 `$deepstream-dev`、`$hallmark`。如新裝內容尚未出現，重新啟動 Codex。[OpenAI skills 說明](https://learn.chatgpt.com/docs/build-skills#how-chatgpt-and-codex-use-skills)
 
 ### 區分本專案安裝位置與新版 Codex discovery
 
@@ -336,12 +349,12 @@ Windows 可在 Git Bash 以相同邏輯建立 native symlink，仍須 `MSYS=wins
 PYTHON_COMMAND=python ./list-skills.sh --platform codex
 ```
 
-這是本專案目前掃描 `~/.codex`／`~/.claude` 的 filesystem inventory，可能含內建或 plugin cache 內容，不等於 client 實際公開的技能清單；也不掃描獨立安裝於 `~/.agents/skills` 的項目。不要以 skills 資料夾數量判定是否正好 444，因為 `i-have-adhd` 由 plugin 提供，其他 plugins 與系統技能也會額外出現。輸出 JSON 若要分享，先檢查內容，勿將私人環境盤點自動提交到 repository。
+這是本專案目前掃描 `~/.codex`／`~/.claude` 的 filesystem inventory，可能含內建或 plugin cache 內容，不等於 client 實際公開的技能清單；也不掃描獨立安裝於 `~/.agents/skills` 的項目。不要以 skills 資料夾數量判定是否正好 445，因為 `i-have-adhd` 由 plugin 提供，其他 plugins 與系統技能也會額外出現。輸出 JSON 若要分享，先檢查內容，勿將私人環境盤點自動提交到 repository。
 
 <a id="nvidia-first"></a>
 ## NVIDIA 優先規則
 
-目前 417 個 NVIDIA skills 與 27 個通用 skills 的目錄名、YAML `name` 沒有交集，所以全部保留。處理同一任務時，若 NVIDIA skill 的產品、任務與先決條件相符，優先選 NVIDIA；一般 API、前端、Git 或 TDD 繼續使用相應通用技能。
+目前 417 個 NVIDIA skills 與 28 個通用 skills 的目錄名、YAML `name` 沒有交集，所以全部保留。處理同一任務時，若 NVIDIA skill 的產品、任務與先決條件相符，優先選 NVIDIA；一般 API、前端、Git 或 TDD 繼續使用相應通用技能。
 
 例如 `compute-sanitizer-diagnose-cuda-bugs` 用於 CUDA correctness，不取代一般 CPU／Web 除錯；`mcore-testing` 用於 Megatron-Core，不取代所有專案的通用測試工作。
 
@@ -361,7 +374,7 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 - 預設 dry-run；只有明確的 `--apply`／PowerShell `-Apply` 修改使用者環境。
 - Codex 遠端 plugin 預檢先於來源下載與 skills 安裝；缺少指定 plugin、查詢失敗或 JSON 無效時先停止。`--skip-hugging-face` 只略過 Hugging Face，不略過 GitHub 或 `i-have-adhd`。
 - NVIDIA 入口先檢查選定 targets 的來源、授權與目的地；同內容 NVIDIA copies／同來源 Bash links 可重跑，差異不覆寫。
-- 通用技能的 symlink 也須指向原來源；bundled copies 須內容相同。既有 Claude plugin 不會被此 bootstrap 自動 update。
+- 通用技能的 symlink 也須指向原來源；bundled 與 Hallmark copies 須內容相同。Hallmark 來源、目的地或其祖先為 symlink／reparse point 時會停止。既有 Claude plugin 不會被此 bootstrap 自動 update。
 - source checkout 不在固定 SHA，或 NVIDIA 已追蹤的 skill／license 檔案被修改時會停止；不執行 reset、pull 或強制切換。
 - 預檢通過後，下載、授權或實際 plugin 安裝仍可能失敗。完整 bootstrap 按階段執行，不回滾先前成功項目；`install-all.sh` 也不回滾前一個 agent。處理錯誤後用相同 profile、來源與旗標重跑，已安裝的 Codex plugins 會跳過，skills 沿用既有內容比較。
 - 不要刪除或搬動 linked source。也不要用另一個帳號或不同 `HOME` 重跑，期待它更新原帳號的安裝。
@@ -371,13 +384,13 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 | 現象 | 處理方式 |
 |---|---|
 | `codex: command not found`／沒有 `plugin` | 在當前 terminal 安裝或更新相容 Codex CLI，確認 `PATH`，再重跑 dry-run |
-| `python3` 找不到 | 安裝 Python 3，或用 `PYTHON_COMMAND=python` 指向可用的 Python 3；Codex plugin 預檢不會自動略過 |
+| `python3` 找不到或版本過舊 | 安裝 Python 3.10+，或用 `PYTHON_COMMAND=python` 指向符合版本的 interpreter；Codex／Claude 的 Hallmark 安裝都需要 Python |
 | Bash arrays／`[[ -v ]]` 語法錯誤 | 使用 Bash 5；macOS 同時調整 `PATH` 讓子腳本找到新版 |
 | Windows symbolic link 權限失敗 | 確認 Developer Mode、檔案系統與 native symlink 設定；無法啟用時選 PowerShell NVIDIA-only 或 WSL |
 | 目的地已有不同 skill／link | 停止，人工比較來源與內容；自行備份、決定遷移方式後再重跑，安裝器不代刪 |
 | source SHA 不符／來源被修改 | 保留既有 checkout，先核對 manifest；新安裝可改用另一個絕對 source root。若已有 linked skills，仍須先人工規劃 links 遷移，不強制重設舊目錄 |
 | 安裝成功但 `/skills` 看不到 | 確認實際 client／profile、官方 discovery 路徑與 `SKILL.md`，參考上方相容處理並重啟 |
-| `/skills` 顯示數量與 444 不同 | 分清 portable manifest、plugins、系統技能與 client context budget；以 manifest 與逐項來源核對 |
+| `/skills` 顯示數量與 445 不同 | 分清 portable manifest、plugins、系統技能與 client context budget；以 manifest 與逐項來源核對 |
 | Plugin marketplace 或授權失敗 | 檢查 network、帳號與 marketplace 名稱；不要把登入資料寫進 manifest，先依錯誤訊息處理 |
 | 找不到 `hugging-face@openai-curated` | 核對可用清單；需要略過時，用相同來源與 profile 加上 `--skip-hugging-face` 先預覽，再 apply，不必刪除已裝好的 skills |
 | GitHub 的 CLI 識別字與預設不同 | 從 CLI 清單核對完整 ID，用 `--github-plugin <plugin@marketplace>` 明確選擇；已安裝的確切項目會跳過，安裝器不從 cache 猜測來源 |
@@ -387,9 +400,9 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 
 在新 clone 中取得已發布版本即可。若已有工作目錄，先檢視 `git status`、保存自己的變更，再由你決定如何更新；此 bootstrap 不自動 commit、push、設定 remote 或替你合併 Git 變更。
 
-更新本專案不代表自動升級所有上游來源。要升級 NVIDIA／agent-skills／i-have-adhd：
+更新本專案不代表自動升級所有上游來源。要升級 NVIDIA／agent-skills／i-have-adhd／Hallmark：
 
-1. 審閱上游變更與授權，更新 [sources.tsv](./manifests/sources.tsv) 的明確 SHA。
+1. 審閱上游變更與授權，更新 [sources.tsv](./manifests/sources.tsv) 的明確 SHA；Hallmark 則更新共用的 [optional-sources.json](./manifests/optional-sources.json)。
 2. 核對技能目錄、YAML `name`、相依 references 與同名優先順序，更新對應 manifests。
 3. 同步本文與 [完整目錄](./docs/skill-catalog.md) 的名稱、摘要、固定版本 citation 與數量。
 4. 執行檢查與 dry-run。遇舊來源／舊 copies 差異，先人工規劃遷移，不自動覆寫。
@@ -410,20 +423,21 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 ./tests/run_all.sh
 ```
 
-完整測試需要 Bash 5、Python 3、`rg` 與 Git；有 `pwsh`／`powershell.exe` 時也會執行隔離的 PowerShell regression tests。測試使用臨時 fixture，不安裝到真實 agent HOME。
+完整測試需要 Bash 5、Python 3.10+、`rg` 與 Git；有 `pwsh`／`powershell.exe` 時也會執行隔離的 PowerShell regression tests。測試使用臨時 fixture，不安裝到真實 agent HOME。
 
 <a id="sources"></a>
 ## 來源、版本與授權
 
-外部 skills 版本由 [sources.tsv](./manifests/sources.tsv) 管理；逐項 citation 使用固定 SHA，不使用浮動 `main`：
+NVIDIA／agent-skills／i-have-adhd 的來源版本由 [sources.tsv](./manifests/sources.tsv) 管理；逐項 citation 使用固定 SHA，不使用浮動 `main`：
 
-Hallmark 2.0.0 與 Codync 2.43.1 的選配來源另由 [optional-sources.json](./manifests/optional-sources.json) 固定；Codync 各平台 release archive 同時固定 SHA256。操作與資料位置見[選配指南](./docs/optional-integrations.md)。
+預設安裝的 Hallmark 2.0.0 與選配 Codync 2.43.1 共用 [optional-sources.json](./manifests/optional-sources.json) 的來源管理；檔名保留不變。Hallmark 固定 commit `407fa689f4a276f2fd389208d271d0fef08f5058`；Codync 各平台 release archive 同時固定 SHA256。操作與資料位置見[獨立安裝指南](./docs/optional-integrations.md)。
 
 | 來源 | 固定版本／citation | 用途 |
 |---|---|---|
 | NVIDIA skills | [`b28d346437cf378402b19a730cd55cec516c77ff`](https://github.com/NVIDIA/skills/tree/b28d346437cf378402b19a730cd55cec516c77ff) · [官方 metadata](https://github.com/NVIDIA/skills/blob/b28d346437cf378402b19a730cd55cec516c77ff/.github/scripts/marketplace/metadata.json) | 417 個 skills 的名稱、alias、分類與用途依據 |
 | agent-skills | [`7829ffd90d973b6325f5f12f1b1226dcace74443`](https://github.com/addyosmani/agent-skills/tree/7829ffd90d973b6325f5f12f1b1226dcace74443) | 24 個通用工程 skills |
 | i-have-adhd | [`07684c4ab625dd7d1ea6e99e065f60bc0ac6a1ba`](https://github.com/ayghri/i-have-adhd/tree/07684c4ab625dd7d1ea6e99e065f60bc0ac6a1ba) | 1 個 skill 與 plugin 安裝來源 |
+| Hallmark 2.0.0 | [`407fa689f4a276f2fd389208d271d0fef08f5058`](https://github.com/Nutlope/hallmark/tree/407fa689f4a276f2fd389208d271d0fef08f5058) | 1 個網頁設計與視覺檢查 skill，預設完整安裝包含 |
 | 本專案 bundled | [karpathy-guidelines](./skills/karpathy-guidelines/SKILL.md) · [backend-api-contracts](./skills/backend-api-contracts/SKILL.md) | 以本專案保存內容為準；沒有可查證的原始上游記錄時不猜外部作者或 URL |
 | Codex plugins | [codex-plugins.txt](./manifests/codex-plugins.txt) | GitHub、Hugging Face 與 i-have-adhd 的 plugin IDs／觀測版本 |
 | Claude plugins | [claude-plugins.txt](./manifests/claude-plugins.txt) · [本機 marketplace](./claude-marketplaces/portable-agent-skills/.claude-plugin/marketplace.json) | Claude plugin IDs 與本機固定 checkout |
@@ -435,19 +449,19 @@ NVIDIA skills 的 manifest 使用來源**目錄名**。其中 32 個 YAML `name`
 安裝 skill 取得的是指引與隨附資源，不等於已安裝 CUDA toolkit、SDK、模型、GPU driver 或各產品服務。請依各 skill 的適用範圍與先決條件執行。
 
 <a id="skill-catalog"></a>
-## 完整技能目錄：444 個
+## 完整技能目錄：445 個
 
-以下按來源與產品列出全部 444 個 portable skills，包含用途摘要與每項固定來源 citation。摘要為繁體中文整理，不替代來源 SKILL.md 的前提、限制與授權；同一份清單另存於 [docs/skill-catalog.md](./docs/skill-catalog.md)。
+以下按來源與產品列出全部 445 個 portable skills，包含用途摘要與每項固定來源 citation。摘要為繁體中文整理，不替代來源 SKILL.md 的前提、限制與授權；同一份清單另存於 [docs/skill-catalog.md](./docs/skill-catalog.md)。
 
 <!-- SKILL_CATALOG_START -->
 
-本目錄依本專案的 [common-skills.txt](./manifests/common-skills.txt)、[agent-skills.txt](./manifests/agent-skills.txt)、[nvidia-skills.txt](./manifests/nvidia-skills.txt) 與 [sources.tsv](./manifests/sources.tsv) 整理：**27 個通用 skills + 417 個 NVIDIA skills = 444 個不重複的安裝項目**。這個數字不包含 plugins 額外提供的 skills、Codex 內建 skills 或舊 [SKILLS.md](./SKILLS.md) 的環境盤點快照。
+本目錄依本專案的 [common-skills.txt](./manifests/common-skills.txt)、[agent-skills.txt](./manifests/agent-skills.txt)、[nvidia-skills.txt](./manifests/nvidia-skills.txt)、[sources.tsv](./manifests/sources.tsv) 與 [optional-sources.json](./manifests/optional-sources.json) 整理：**28 個通用 skills（含 Hallmark）+ 417 個 NVIDIA skills = 445 個不重複的安裝項目**。Codex 與 Claude Code 完整安裝各包含這 445 項；plugins 額外提供的 skills、agent 內建 skills 與 Claude commands 另計，舊 [SKILLS.md](./SKILLS.md) 仍為環境盤點快照。
 
 每一列的 identifier 是 manifest 的目錄名稱；若原始 SKILL.md 的 YAML `name` 不同，同行加註。安裝路徑與精確指定技能時須區分這兩者。下列每項外部來源均固定到本專案鎖定的 commit，不會因上游 main 改動而指向別的版本。
 
 用途文字是本專案整理的繁體中文摘要；完整適用範圍、前置條件、限制與執行規則以每列引用的 SKILL.md 為準。若 NVIDIA skill 涵蓋目前任務，同名或功能雷同時優先選 NVIDIA；通用工程 skills 補足其未涵蓋的部分。這項選用規則不會刪除其他 skill，也不會把產品限定流程套用到範圍外的工作。
 
-### 通用基線（27）
+### 通用基線（28）
 
 #### addyosmani/agent-skills（24）
 
@@ -487,6 +501,14 @@ NVIDIA skills 的 manifest 使用來源**目錄名**。其中 32 個 YAML `name`
 | Identifier | 用途摘要 | 原始來源 citation |
 |---|---|---|
 | `i-have-adhd` | 調整回覆順序、步驟與資訊密度，支援需要 ADHD 友善輸出的使用者。 | [SKILL.md](https://github.com/ayghri/i-have-adhd/blob/07684c4ab625dd7d1ea6e99e065f60bc0ac6a1ba/skills/i-have-adhd/SKILL.md) |
+
+#### Nutlope/hallmark（1）
+
+Hallmark 2.0.0；固定版本 `407fa689f4a276f2fd389208d271d0fef08f5058`，來源由共用的 [optional-sources.json](./manifests/optional-sources.json) 管理，已納入預設完整安裝。授權為 [MIT](https://github.com/Nutlope/hallmark/blob/407fa689f4a276f2fd389208d271d0fef08f5058/skills/hallmark/LICENSE)；Copyright (c) 2026 Hallmark contributors。
+
+| Identifier | 用途摘要 | 原始來源 citation |
+|---|---|---|
+| `hallmark` | 為新網站與頁面規劃視覺方向、主題及設計檢查；既有設計的稽核與重設計須明確指定 Hallmark。 | [SKILL.md](https://github.com/Nutlope/hallmark/blob/407fa689f4a276f2fd389208d271d0fef08f5058/skills/hallmark/SKILL.md) |
 
 #### 本專案 bundled skills（2）
 

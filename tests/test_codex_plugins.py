@@ -94,24 +94,66 @@ import sys
 from pathlib import Path
 
 args = sys.argv[1:]
+operation = args[2:] if args[:1] == ["-C"] else args
+if operation[:2] == ["-c", "core.autocrlf=false"]:
+    operation = operation[2:]
 with Path(os.environ["PLUGIN_TEST_EVENTS"]).open("a") as stream:
     stream.write(json.dumps({"command": "git", "args": args,
-                             "mutation": args[:1] == ["clone"]}) + "\n")
+                             "mutation": operation[:1] in [["clone"], ["init"], ["fetch"], ["checkout"]]}) + "\n")
 if args[:1] == ["clone"] and len(args) == 3:
     name = args[1].rsplit("/", 1)[-1]
     if name.endswith(".git"):
         name = name[:-4]
     shutil.copytree(Path(os.environ["PLUGIN_TEST_FIXTURES"]) / name, args[2], dirs_exist_ok=True)
+elif args[:1] == ["init"] and len(args) == 2:
+    (Path(args[1]) / ".git").mkdir(parents=True)
+elif args[:1] == ["-C"] and operation[:4] == ["fetch", "--depth", "1", "--"]:
+    name = operation[4].rsplit("/", 1)[-1].removesuffix(".git")
+    fixture = Path(os.environ["PLUGIN_TEST_FIXTURES"]) / name
+    if (fixture / ".git" / "HEAD").read_text().strip() != operation[5]:
+        sys.exit(14)
+    shutil.copytree(fixture, args[1], dirs_exist_ok=True)
 elif args[:1] == ["-C"] and args[2:] == ["rev-parse", "HEAD"]:
     print((Path(args[1]) / ".git" / "HEAD").read_text().strip())
-elif args[:1] == ["-C"] and args[2:4] == ["checkout", "--detach"]:
-    if (Path(args[1]) / ".git" / "HEAD").read_text().strip() != args[4]:
+elif args[:1] == ["-C"] and operation[:2] == ["checkout", "--detach"]:
+    if (Path(args[1]) / ".git" / "HEAD").read_text().strip() != operation[2]:
         sys.exit(14)
 elif args[:1] == ["-C"] and args[2:4] == ["diff", "--quiet"]:
+    pass
+elif args[:1] == ["-C"] and operation == ["status", "--porcelain", "--untracked-files=all", "--ignored"]:
     pass
 else:
     print("unexpected fake git invocation: " + repr(args), file=sys.stderr)
     sys.exit(15)
+'''
+
+
+FAKE_CLAUDE = r'''
+import json
+import os
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+state_path = Path(os.environ["PLUGIN_TEST_STATE"])
+state = json.loads(state_path.read_text())
+with Path(os.environ["PLUGIN_TEST_EVENTS"]).open("a") as stream:
+    stream.write(json.dumps({"command": "claude", "args": args,
+                             "mutation": "install" in args or "add" in args}) + "\n")
+if args == ["plugin", "list"]:
+    print("\n".join(state.get("claude_installed", [])))
+elif args == ["plugin", "marketplace", "list"]:
+    print("\n".join(state.get("claude_marketplaces", [])))
+elif args[:2] == ["plugin", "install"] and len(args) == 3:
+    state.setdefault("claude_installed", []).append(args[2])
+    state_path.write_text(json.dumps(state))
+elif args[:3] == ["plugin", "marketplace", "add"] and len(args) == 4:
+    manifest = Path(args[3]) / ".claude-plugin" / "marketplace.json"
+    state.setdefault("claude_marketplaces", []).append(json.loads(manifest.read_text())["name"])
+    state_path.write_text(json.dumps(state))
+else:
+    print("unexpected fake claude invocation: " + repr(args), file=sys.stderr)
+    sys.exit(16)
 '''
 
 
@@ -120,9 +162,10 @@ class CodexPluginBootstrapTest(unittest.TestCase):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary_directory.cleanup)
         self.root = Path(self.temporary_directory.name)
-        self.home = self.root / "home"
-        self.codex_home = self.root / "codex"
-        self.sources = self.root / "sources"
+        self.home = self.root / "home with spaces"
+        self.codex_home = self.root / "codex with spaces"
+        self.claude_home = self.root / "claude with spaces"
+        self.sources = self.root / "sources with spaces"
         self.fixtures = self.root / "fixtures"
         self.control_path = self.root / "control.json"
         self.state_path = self.root / "state.json"
@@ -131,7 +174,7 @@ class CodexPluginBootstrapTest(unittest.TestCase):
         self.state_path.write_text(json.dumps({"installed": [], "marketplaces": []}))
         self.bin = self.root / "bin"
         self.bin.mkdir()
-        for name, script in [("codex", FAKE_CODEX), ("git", FAKE_GIT)]:
+        for name, script in [("codex", FAKE_CODEX), ("claude", FAKE_CLAUDE), ("git", FAKE_GIT)]:
             path = self.bin / name
             path.write_text("#!" + sys.executable + "\n" + script)
             path.chmod(0o755)
@@ -139,7 +182,7 @@ class CodexPluginBootstrapTest(unittest.TestCase):
         self.environment.update(
             HOME=str(self.home),
             CODEX_HOME=str(self.codex_home),
-            CLAUDE_CONFIG_DIR=str(self.root / "claude"),
+            CLAUDE_CONFIG_DIR=str(self.claude_home),
             AI_AGENT_SOURCE_ROOT=str(self.sources),
             PATH=str(self.bin) + os.pathsep + os.environ["PATH"],
             PYTHON_COMMAND=sys.executable,
@@ -170,15 +213,29 @@ class CodexPluginBootstrapTest(unittest.TestCase):
                     (checkout / directory).mkdir()
                     filename = "marketplace.json" if directory == ".claude-plugin" else "plugin.json"
                     (checkout / directory / filename).write_text(json.dumps(manifest))
+        self.hallmark_package = json.loads(
+            (REPOSITORY_ROOT / "manifests" / "optional-sources.json").read_text()
+        )["packages"]["hallmark"]
+        self.hallmark_fixture = self.fixtures / "hallmark"
+        (self.hallmark_fixture / ".git").mkdir(parents=True)
+        (self.hallmark_fixture / ".git" / "HEAD").write_text(self.hallmark_package["commit"] + "\n")
+        hallmark_skill = self.hallmark_fixture / self.hallmark_package["skill_path"]
+        self.write_skill(hallmark_skill, "hallmark")
+        (hallmark_skill / "themes").mkdir()
+        (hallmark_skill / "themes" / "example.md").write_text("Full Hallmark theme fixture\n")
+        for name in self.hallmark_package["license_files"]:
+            license_path = self.hallmark_fixture / name
+            license_path.parent.mkdir(parents=True, exist_ok=True)
+            license_path.write_text("Hallmark license fixture\n")
 
     @staticmethod
     def write_skill(directory, name):
         directory.mkdir(parents=True)
         (directory / "SKILL.md").write_text("---\nname: " + name + "\ndescription: Fixture.\n---\n")
 
-    def run_bootstrap(self, *arguments, nvidia=False):
+    def run_bootstrap(self, *arguments, nvidia=False, target="codex"):
         self.control_path.write_text(json.dumps(self.control))
-        command = ["bash", str(REPOSITORY_ROOT / "install-codex.sh")]
+        command = ["bash", str(REPOSITORY_ROOT / f"install-{target}.sh")]
         if not nvidia:
             command.append("--without-nvidia")
         return subprocess.run(
@@ -202,6 +259,7 @@ class CodexPluginBootstrapTest(unittest.TestCase):
     def assert_no_install_changes(self):
         self.assertFalse(self.sources.exists(), "preflight downloaded a source")
         self.assertFalse(self.codex_home.exists(), "preflight changed the Codex environment")
+        self.assertFalse(self.claude_home.exists(), "preflight changed the Claude environment")
         self.assertFalse(self.home.exists(), "preflight changed HOME")
         self.assertFalse(any(event["mutation"] for event in self.events()), self.events())
 
@@ -368,6 +426,60 @@ class CodexPluginBootstrapTest(unittest.TestCase):
         self.assert_success(result)
         self.assertIn("[dry-run]", result.stdout)
         self.assertTrue(any(event["args"][:2] == ["plugin", "list"] for event in self.events()))
+        self.assert_no_install_changes()
+
+    def test_default_bootstrap_copies_complete_hallmark_and_licenses_to_both_agents(self):
+        result = self.run_bootstrap("--apply", target="all")
+        self.assert_success(result)
+        installed = []
+        for config in (self.codex_home, self.claude_home):
+            destination = config / "skills" / "hallmark"
+            self.assertFalse(destination.is_symlink())
+            for source in (self.hallmark_fixture / self.hallmark_package["skill_path"]).rglob("*"):
+                if source.is_file():
+                    target = destination / source.relative_to(
+                        self.hallmark_fixture / self.hallmark_package["skill_path"]
+                    )
+                    self.assertEqual(source.read_bytes(), target.read_bytes())
+                    installed.append(target)
+            for name in self.hallmark_package["license_files"]:
+                target = config / "licenses" / "hallmark" / self.hallmark_package["commit"] / name
+                self.assertEqual((self.hallmark_fixture / name).read_bytes(), target.read_bytes())
+                installed.append(target)
+        original_stats = [(path.stat().st_ino, path.stat().st_mtime_ns) for path in installed]
+        first_mutations = [event for event in self.events() if event["mutation"]]
+        self.assertTrue(any(event["command"] == "git" and "fetch" in event["args"]
+                            for event in first_mutations))
+        self.assertFalse(any("codync" in str(event).lower() for event in self.events()))
+        self.assertFalse((self.home / ".local").exists(), "default bootstrap installed a runtime")
+
+        second = self.run_bootstrap("--apply", target="all")
+        self.assert_success(second)
+        self.assertEqual(original_stats, [(path.stat().st_ino, path.stat().st_mtime_ns)
+                                          for path in installed])
+        self.assertEqual(first_mutations, [event for event in self.events() if event["mutation"]])
+
+    def test_hallmark_content_conflict_stops_without_overwriting_or_installing_baseline(self):
+        for target, config in (("codex", self.codex_home), ("claude", self.claude_home)):
+            with self.subTest(target=target):
+                destination = config / "skills" / "hallmark"
+                self.write_skill(destination, "user-hallmark")
+                original = (destination / "SKILL.md").read_bytes()
+                result = self.run_bootstrap("--apply", target=target)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("refusing to overwrite", result.stderr)
+                self.assertEqual(original, (destination / "SKILL.md").read_bytes())
+                self.assertFalse((config / "skills" / "backend-api-contracts").exists())
+                self.assertFalse((destination / "themes").exists())
+        self.assertEqual(self.plugin_adds(), [])
+        self.assertFalse(any(event["command"] == "claude" and event["mutation"]
+                             for event in self.events()))
+
+    def test_claude_requires_python_before_any_install_changes(self):
+        self.environment["PYTHON_COMMAND"] = str(self.root / "missing-python")
+        result = self.run_bootstrap("--apply", target="claude")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("required command not found", result.stderr)
         self.assert_no_install_changes()
 
     def test_preflight_uses_utf8_input_and_lf_output_with_windows_text_wrappers(self):

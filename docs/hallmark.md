@@ -1,4 +1,4 @@
-# Hallmark：選配網頁設計技能
+# Hallmark：預設網頁設計技能與獨立補裝
 
 Hallmark 補充網頁的視覺方向、50 種主題與 `sloplint` 設計檢查，適合新網站、
 產品頁、元件，以及明確指定的 UI 重設計。既有 `frontend-ui-engineering` 負責
@@ -16,7 +16,16 @@ console 除錯；三者可以配合使用。
 
 ## 安裝
 
-從本 repository 根目錄先預覽，再明確套用。Bash：
+`install-codex.sh`、`install-claude.sh` 與 `install-all.sh` 的完整安裝已自動包含
+Hallmark；Codex 與 Claude Code 各有 **445 個 portable skills**，即 NVIDIA 417
+加上包含 Hallmark 的通用基線 28。`--without-nvidia` 也包含 Hallmark，安裝 28 個
+通用 skills。這些入口都需要 Git、Bash 5、Python 3.10+ 與目標 agent CLI；
+`PYTHON_COMMAND` 可指定 Python interpreter，例如 `PYTHON_COMMAND=python`。
+Hallmark 來源仍由共用的 [optional-sources.json](../manifests/optional-sources.json)
+管理，Codync 仍須另行選配安裝。
+
+舊環境只需補 Hallmark 時，可保留既有 skills，從本 repository 根目錄先預覽，
+再明確套用。獨立入口需要 Git、Python 3.10+ 與下載來源所需的網路。Bash：
 
 ```bash
 ./install-optional.sh --package hallmark --target codex
@@ -31,7 +40,16 @@ Windows PowerShell：
 ```
 
 要同時提供給 Codex 與 Claude Code，使用 `--target both`／`-Target Both`。
-入口預設 dry-run；同名目的地內容不同時停止，先比較與備份，再決定如何遷移。
+Windows Git Bash 的完整入口也會自動安裝 Hallmark；PowerShell 的
+`install-nvidia.ps1` 只安裝 417 個 NVIDIA skills，須用上面的獨立入口補 Hallmark。
+入口預設 dry-run；已用獨立入口安裝、內容相同的 Hallmark copy 可直接重跑完整安裝，
+不會覆寫。同名內容不同、symlink／reparse point 或來源被修改時會停止，
+先比較與備份，再決定如何遷移。
+
+Hallmark 會複製到 `<CODEX_HOME>/skills/hallmark/` 或
+`<CLAUDE_CONFIG_DIR>/skills/hallmark/`；預設為 `~/.codex`／`~/.claude`。
+固定來源保存在 `~/src/ai-agent-sources/hallmark-<完整 SHA>/`，授權另存於各
+agent profile 的 `licenses/hallmark/<完整 SHA>/`。安裝檔案不會啟動服務或瀏覽器。
 
 安裝保留完整 `skills/hallmark/`，包含 `SKILL.md`、`LICENSE`、`agents/`、
 `references/`、`scripts/`，以及主題圖片與素材索引。這個目錄沒有自己的

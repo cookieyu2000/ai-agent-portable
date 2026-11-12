@@ -117,7 +117,7 @@ fi
 common_skill_count="$(
     grep -c '^[a-z]' "${BUNDLE_ROOT}/manifests/common-skills.txt"
 )"
-if [[ "${common_skill_count}" -eq 27 ]]; then
+if [[ "${common_skill_count}" -eq 28 ]]; then
     printf 'ok: common Codex/Claude baseline (%s)\n' "${common_skill_count}"
 else
     printf 'unexpected common skill count: %s\n' "${common_skill_count}" >&2
@@ -127,8 +127,8 @@ fi
 nvidia_skill_count="$(grep -c '^[a-z]' "${BUNDLE_ROOT}/manifests/nvidia-skills.txt")"
 nvidia_unique_count="$(grep '^[a-z]' "${BUNDLE_ROOT}/manifests/nvidia-skills.txt" | LC_ALL=C sort -u | wc -l | tr -d ' ')"
 portable_skill_count="$(cat "${BUNDLE_ROOT}/manifests/common-skills.txt" "${BUNDLE_ROOT}/manifests/nvidia-skills.txt" | grep '^[a-z]' | LC_ALL=C sort -u | wc -l | tr -d ' ')"
-if [[ "${nvidia_skill_count}" -eq 417 && "${nvidia_unique_count}" -eq 417 && "${portable_skill_count}" -eq 444 ]]; then
-    printf 'ok: complete NVIDIA catalog (417); portable skills (444)\n'
+if [[ "${nvidia_skill_count}" -eq 417 && "${nvidia_unique_count}" -eq 417 && "${portable_skill_count}" -eq 445 ]]; then
+    printf 'ok: complete NVIDIA catalog (417); portable skills (445)\n'
 else
     printf 'unexpected NVIDIA/unique/portable counts: %s/%s/%s\n' \
         "${nvidia_skill_count}" "${nvidia_unique_count}" "${portable_skill_count}" >&2
@@ -144,7 +144,7 @@ while IFS= read -r skill_name; do
     fi
 done <"${BUNDLE_ROOT}/manifests/agent-skills.txt"
 
-for skill_name in karpathy-guidelines backend-api-contracts i-have-adhd; do
+for skill_name in karpathy-guidelines backend-api-contracts i-have-adhd hallmark; do
     if ! grep -Fx "${skill_name}" \
         "${BUNDLE_ROOT}/manifests/common-skills.txt" >/dev/null; then
         printf 'common baseline is missing portable skill: %s\n' \

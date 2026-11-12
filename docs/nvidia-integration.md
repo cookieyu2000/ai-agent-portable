@@ -6,7 +6,7 @@
 由 [sources.tsv](../manifests/sources.tsv) 管理。
 
 各平台完整安裝、驗證與更新步驟見 [README 安裝指南](../README.md#prerequisites)；
-全部 444 個 portable skills 的用途與逐項固定來源 citation 見
+全部 445 個 portable skills 的用途與逐項固定來源 citation 見
 [完整技能目錄](./skill-catalog.md)。
 
 完整清單已依該版本的 `skills/*/SKILL.md` 與官方
@@ -23,11 +23,11 @@
 ./install-all.sh --apply
 ```
 
-預設為 **417 個 NVIDIA skills ＋ 27 個通用技能，共 444 個不重複 portable skills**，
+預設為 **417 個 NVIDIA skills ＋ 28 個通用技能（含 Hallmark），共 445 個不重複 portable skills**，
 並按各平台的 plugin manifest 安裝 plugins。只安裝一個 agent 可使用
 `./install-codex.sh` 或 `./install-claude.sh`。
 
-`--with-nvidia` 保留為相容旗標，效果與預設相同。只安裝原有通用基線：
+`--with-nvidia` 保留為相容旗標，效果與預設相同。只安裝通用基線（含 Hallmark）：
 
 ```bash
 ./install-all.sh --without-nvidia --dry-run
@@ -44,7 +44,7 @@ bash ./install-nvidia.sh --target both --apply
 Bash 將完整 skill 目錄連結至 `~/.codex/skills/<directory>` 或
 `~/.claude/skills/<directory>`；`SKILL.md`、`references/`、`scripts/` 與來源授權
 保留於完整 checkout。Windows 若只需要 NVIDIA，可使用下方原生 PowerShell 入口，
-避免 symbolic link 權限差異；完整 444 項請依
+避免 symbolic link 權限差異；完整 445 項請依
 [README 的 Windows Git Bash 步驟](../README.md#windows-full) 準備 native symlinks。
 
 ## Windows：PowerShell 5.1+ 與 Git for Windows
@@ -58,7 +58,7 @@ Bash 將完整 skill 目錄連結至 `~/.codex/skills/<directory>` 或
 .\install-nvidia.ps1 -Target Claude -Apply # 只安裝到 Claude
 ```
 
-未傳入 `-Apply` 一律為 dry-run。此入口只安裝 NVIDIA skills，其餘 27 個通用技能與
+未傳入 `-Apply` 一律為 dry-run。此入口只安裝 NVIDIA skills，其餘 28 個通用技能與
 plugins 仍由 Bash bootstrap 管理。
 
 PowerShell 先取得固定版本來源，再預檢所有選定 targets 的既有 skill、link 與授權
@@ -79,7 +79,7 @@ Developer Mode 或 symbolic link 權限。已存在且內容相同的目錄可�
 
 ## 同名與功能重疊
 
-目前 417 個 NVIDIA 目錄名與原有 27 個通用技能沒有交集，YAML `name` 也沒有交集，
+目前 417 個 NVIDIA 目錄名與 28 個通用技能沒有交集，YAML `name` 也沒有交集，
 所以全部保留。新安裝清單若出現同名項目，優先選 NVIDIA 來源；既有不同內容的 skill
 或指向不同來源的 link 仍拒絕覆寫，需人工比較與處理。
 

@@ -22,9 +22,10 @@ last="${skills[${#skills[@]}-1]}"
 commit="$(awk -F '\t' '$1 == "nvidia-skills" { print $3 }' "${ROOT}/manifests/sources.tsv")"
 
 mkdir -p "${TEMP}/bin" "${TEMP}/bundle/scripts"
-cp "${ROOT}/install-nvidia.sh" "${TEMP}/bundle/"
+cp "${ROOT}/install-nvidia.sh" "${ROOT}/install-optional.sh" "${TEMP}/bundle/"
 cp "${ROOT}/scripts/bootstrap.sh" "${TEMP}/bundle/scripts/"
 cp "${ROOT}/scripts/codex_plugins.py" "${TEMP}/bundle/scripts/"
+cp "${ROOT}/scripts/install_optional.py" "${TEMP}/bundle/scripts/"
 cp -R "${ROOT}/manifests" "${ROOT}/skills" "${ROOT}/claude-marketplaces" "${TEMP}/bundle/"
 cat >"${TEMP}/bin/codex" <<'EOF'
 #!/usr/bin/env bash
@@ -118,6 +119,14 @@ for target in codex claude; do
         fail 'same-name i-have-adhd plugin was still installed'
     fi
     expect_failure "existing ${target} plugin i-have-adhd" env FAKE_ADHD_PLUGIN=true "${bootstrap}" --target "${target}" --apply
+done
+printf '%s\n' hallmark >>"${TEMP}/bundle/manifests/nvidia-skills.txt"
+for target in codex claude; do
+    output="$("${bootstrap}" --target "${target}")"
+    grep -Fq 'prefer NVIDIA: skip baseline skill hallmark' <<<"${output}"
+    if grep -Fq 'complete: optional hallmark' <<<"${output}"; then
+        fail 'same-name Hallmark skill was still installed from the baseline source'
+    fi
 done
 cp "${ROOT}/manifests/nvidia-skills.txt" "${TEMP}/bundle/manifests/nvidia-skills.txt"
 

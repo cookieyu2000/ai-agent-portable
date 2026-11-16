@@ -11,6 +11,8 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 GITHUB = "github@openai-curated"
 HUGGING_FACE = "hugging-face@openai-curated"
+REMOTE_GITHUB = "github@openai-curated-remote"
+REMOTE_HUGGING_FACE = "huggingface@openai-curated-remote"
 ADHD = "i-have-adhd@i-have-adhd"
 
 
@@ -30,8 +32,11 @@ with Path(os.environ["PLUGIN_TEST_EVENTS"]).open("a") as stream:
 
 def entry(plugin_id, installed):
     name, marketplace = plugin_id.split("@", 1)
-    return {"pluginId": plugin_id, "name": name, "marketplaceName": marketplace,
-            "installed": installed, "enabled": installed}
+    result = {"pluginId": plugin_id, "name": name, "marketplaceName": marketplace,
+              "installed": installed, "enabled": installed}
+    if plugin_id in control.get("sources", {}):
+        result["source"] = control["sources"][plugin_id]
+    return result
 
 available = list(control.get("available", []))
 if "i-have-adhd" in state["marketplaces"]:
@@ -306,6 +311,110 @@ class CodexPluginBootstrapTest(unittest.TestCase):
         self.assert_success(result)
         self.assertEqual(self.plugin_adds(), [GITHUB, HUGGING_FACE, ADHD])
 
+    def remote_catalog(self):
+        self.control = {
+            "available": [REMOTE_GITHUB, REMOTE_HUGGING_FACE],
+            "marketplaces": [],
+            "sources": {plugin: {"source": "remote", "id": "fixture-" + plugin}
+                        for plugin in (REMOTE_GITHUB, REMOTE_HUGGING_FACE)},
+        }
+
+    def test_default_reuses_installed_remote_plugins_with_only_local_marketplace(self):
+        self.state_path.write_text(json.dumps({
+            "installed": [REMOTE_GITHUB, REMOTE_HUGGING_FACE], "marketplaces": [],
+        }))
+        self.control["available"] = []
+        result = self.run_bootstrap("--apply")
+        self.assert_success(result)
+        self.assertEqual(self.plugin_adds(), [ADHD])
+        for plugin in (REMOTE_GITHUB, REMOTE_HUGGING_FACE):
+            self.assertIn("already installed: " + plugin, result.stdout)
+
+    def test_remote_catalog_installs_without_local_registration_and_rerun_is_unchanged(self):
+        self.remote_catalog()
+        first = self.run_bootstrap("--apply")
+        self.assert_success(first)
+        self.assertEqual(self.plugin_adds(), [REMOTE_GITHUB, REMOTE_HUGGING_FACE, ADHD])
+        mutations = [event for event in self.events() if event["mutation"]]
+        second = self.run_bootstrap("--apply")
+        self.assert_success(second)
+        self.assertEqual(mutations, [event for event in self.events() if event["mutation"]])
+        self.assertEqual(json.loads(self.state_path.read_text())["marketplaces"], ["i-have-adhd"])
+
+    def test_remote_catalog_default_dry_run_plans_selected_ids_without_changes(self):
+        self.remote_catalog()
+        result = self.run_bootstrap()
+        self.assert_success(result)
+        for plugin in (REMOTE_GITHUB, REMOTE_HUGGING_FACE):
+            self.assertIn("[dry-run] codex plugin add " + plugin, result.stdout)
+        self.assert_no_install_changes()
+
+    def test_installed_legacy_plugins_are_preferred_over_available_remote_plugins(self):
+        self.remote_catalog()
+        self.state_path.write_text(json.dumps({
+            "installed": [GITHUB, HUGGING_FACE], "marketplaces": [],
+        }))
+        result = self.run_bootstrap("--apply")
+        self.assert_success(result)
+        self.assertEqual(self.plugin_adds(), [ADHD])
+        for plugin in (GITHUB, HUGGING_FACE):
+            self.assertIn("already installed: " + plugin, result.stdout)
+
+    def test_remote_plugins_are_preferred_when_both_catalog_variants_are_available(self):
+        self.remote_catalog()
+        self.control["available"].extend([GITHUB, HUGGING_FACE])
+        self.control["marketplaces"] = ["openai-curated"]
+        result = self.run_bootstrap("--apply")
+        self.assert_success(result)
+        self.assertEqual(self.plugin_adds(), [REMOTE_GITHUB, REMOTE_HUGGING_FACE, ADHD])
+
+    def test_both_installed_variants_select_remote_without_reinstallation(self):
+        plugins = [GITHUB, HUGGING_FACE, REMOTE_GITHUB, REMOTE_HUGGING_FACE]
+        self.state_path.write_text(json.dumps({"installed": plugins, "marketplaces": []}))
+        self.control = {"available": [], "marketplaces": []}
+        result = self.run_bootstrap("--apply")
+        self.assert_success(result)
+        self.assertEqual(self.plugin_adds(), [ADHD])
+        for plugin in (REMOTE_GITHUB, REMOTE_HUGGING_FACE):
+            self.assertIn("already installed: " + plugin, result.stdout)
+        self.assertEqual(json.loads(self.state_path.read_text())["installed"], plugins + [ADHD])
+
+    def test_explicit_unavailable_legacy_ids_do_not_fall_back_to_installed_remote(self):
+        self.state_path.write_text(json.dumps({
+            "installed": [REMOTE_GITHUB, REMOTE_HUGGING_FACE], "marketplaces": [],
+        }))
+        self.control["available"] = []
+        for flag, plugin in (("--github-plugin", GITHUB),
+                             ("--hugging-face-plugin", HUGGING_FACE)):
+            with self.subTest(flag=flag):
+                result = self.run_bootstrap(flag, plugin, "--apply")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(plugin, result.stderr)
+                self.assert_no_install_changes()
+
+    def test_remote_looking_ids_without_remote_source_require_registered_marketplace(self):
+        for source in (None, "remote", [], {}, {"source": "local"}, {"source": None}):
+            with self.subTest(source=source):
+                self.remote_catalog()
+                self.control["sources"][REMOTE_GITHUB] = source
+                result = self.run_bootstrap("--apply")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(REMOTE_GITHUB, result.stderr)
+                self.assert_no_install_changes()
+        self.control["sources"].pop(REMOTE_GITHUB)
+        result = self.run_bootstrap("--apply")
+        self.assertNotEqual(result.returncode, 0)
+        self.assert_no_install_changes()
+
+    def test_unknown_same_named_marketplaces_are_not_selected_by_default(self):
+        self.control = {
+            "available": ["github@custom", "huggingface@custom"],
+            "marketplaces": ["custom"],
+        }
+        result = self.run_bootstrap("--apply")
+        self.assertNotEqual(result.returncode, 0)
+        self.assert_no_install_changes()
+
     def test_plugin_from_other_marketplace_does_not_satisfy_exact_id(self):
         self.state_path.write_text(json.dumps({"installed": ["github@different-marketplace"],
                                              "marketplaces": []}))
@@ -345,6 +454,46 @@ class CodexPluginBootstrapTest(unittest.TestCase):
                 result = self.run_bootstrap("--apply", *arguments)
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn("github", result.stdout + result.stderr)
+                self.assert_no_install_changes()
+
+    def test_hugging_face_override_is_forwarded_by_install_all_and_ignored_by_claude(self):
+        plugin = "huggingface@custom"
+        self.control["available"] = [GITHUB, HUGGING_FACE, plugin]
+        self.control["marketplaces"] = ["openai-curated", "custom"]
+        result = self.run_bootstrap("--hugging-face-plugin", plugin, "--apply", target="all")
+        self.assert_success(result)
+        self.assertEqual(self.plugin_adds(), [GITHUB, plugin, ADHD])
+        self.assertIn("complete: claude bootstrap (apply)", result.stdout)
+
+    def test_hyphenated_hugging_face_override_accepts_installed_exact_id(self):
+        plugin = "hugging-face@custom"
+        self.state_path.write_text(json.dumps({"installed": [plugin], "marketplaces": []}))
+        result = self.run_bootstrap("--hugging-face-plugin", plugin, "--apply")
+        self.assert_success(result)
+        self.assertEqual(self.plugin_adds(), [GITHUB, ADHD])
+
+    def test_skip_hugging_face_takes_priority_over_valid_override(self):
+        self.control["available"] = [GITHUB]
+        result = self.run_bootstrap("--hugging-face-plugin", "huggingface@missing",
+                                    "--skip-hugging-face", "--apply")
+        self.assert_success(result)
+        self.assertEqual(self.plugin_adds(), [GITHUB, ADHD])
+
+    def test_missing_or_invalid_hugging_face_override_stops_before_changes(self):
+        invalid_arguments = [
+            ["--hugging-face-plugin"],
+            ["--hugging-face-plugin", ""],
+            ["--hugging-face-plugin", "huggingface"],
+            ["--hugging-face-plugin", "github@openai-curated"],
+            ["--hugging-face-plugin", "hugging-face@"],
+            ["--hugging-face-plugin", "huggingface@@openai-curated"],
+            ["--hugging-face-plugin", "huggingface@space here"],
+        ]
+        for arguments in invalid_arguments:
+            with self.subTest(arguments=arguments):
+                result = self.run_bootstrap("--apply", *arguments)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("hugging", result.stdout + result.stderr)
                 self.assert_no_install_changes()
 
     def test_false_installed_flag_does_not_skip_installation(self):

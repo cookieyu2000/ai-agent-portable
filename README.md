@@ -242,9 +242,16 @@ bash --version
 
 ### Codex plugin 預檢與選項
 
-Codex bootstrap 在 clone 來源、安裝 NVIDIA／通用 skills 或修改 plugin 設定前，先讀取 `codex plugin list --available --json` 與 `codex plugin marketplace list --json`。預檢依完整 `pluginId` 區分已安裝與可安裝的項目；已安裝者不重複 `add`，dry-run 也會反映此狀態，且不要求它的來源出現在 marketplace 清單中。尚未安裝者必須同時出現在可用清單，且其 marketplace 已存在。查詢失敗、JSON 無效或缺少必要項目時會先停止。
+Codex bootstrap 在 clone 來源、安裝 NVIDIA／通用 skills 或修改 plugin 設定前，先讀取 `codex plugin list --available --json` 與 `codex plugin marketplace list --json`。預檢依完整 `pluginId` 區分已安裝與可安裝的項目；已安裝者不重複 `add`，dry-run 也會反映此狀態，且不要求它的來源出現在 marketplace 清單中。尚未安裝者必須出現在可用清單：CLI 標記 `source.source` 為 `remote` 的項目不需要註冊本機 marketplace；其他來源則須已有對應 marketplace。查詢失敗、JSON 無效或缺少必要項目時會先停止。
 
-預設仍包含 `hugging-face@openai-curated`。若這個組合在目前環境不可用，或已透過其他整合使用 Hugging Face，可明確加上 `--skip-hugging-face`，略過它的預檢與安裝，並繼續 GitHub 和 `i-have-adhd`。此旗標可與 `--without-nvidia` 合用；也可傳給 `install-all.sh`，只影響其中的 Codex 階段，Claude 階段接受但不使用它。
+預設從 CLI 清單中的以下官方 IDs 選擇 GitHub 與 Hugging Face。每個 plugin 優先沿用已安裝項目，再選可安裝項目；同一順位中優先選 remote ID，再選舊版 ID。安裝器會顯示選定的完整 ID，預檢與安裝使用同一值。
+
+| Plugin | Remote ID | 舊版 ID |
+|---|---|---|
+| GitHub | `github@openai-curated-remote` | `github@openai-curated` |
+| Hugging Face | `huggingface@openai-curated-remote` | `hugging-face@openai-curated` |
+
+若目前環境沒有可用的 Hugging Face plugin，或已透過其他整合使用，可明確加上 `--skip-hugging-face`，略過它的預檢與安裝，並繼續 GitHub 和 `i-have-adhd`。此旗標可與 `--without-nvidia` 合用。
 
 可先查看當前 CLI 的清單，核對確切名稱、來源與已安裝狀態：
 
@@ -253,17 +260,15 @@ codex plugin list --available --json
 codex plugin marketplace list --json
 ```
 
-其他整合或快取中出現 `huggingface`，不代表它與 `hugging-face@openai-curated` 相同，也不代表快取目錄名能直接當 CLI marketplace 使用。安裝器不自動猜測替代識別字。
+自動選擇僅限表中的完整 IDs；不從 cache、資料夾名稱或其他整合猜測已安裝狀態。若需固定使用某個 CLI 項目，可用 `--github-plugin <github@marketplace>` 或 `--hugging-face-plugin <huggingface@marketplace>` 明確指定；後者也接受 `hugging-face@marketplace`。明確指定後只檢查該 ID，不會自動改選其他來源。
 
-GitHub 預設為 `github@openai-curated`。若 CLI 清單確認你的完整識別字是其他來源，可用 `--github-plugin <plugin@marketplace>` 明確指定；該值會同時用於預檢和安裝，不會自動替換。同一名稱在不同 marketplace 的項目分別檢查，cache 或舊設定存在不等於當前 CLI 已安裝。
-
-例如，目前設備若已確認安裝 `github@openai-curated-remote`，可沿用它並略過 Hugging Face，先預覽續裝計畫：
+例如，明確選擇目前 CLI 的兩個 remote IDs 並預覽續裝計畫：
 
 ```bash
-./install-codex.sh --github-plugin github@openai-curated-remote --skip-hugging-face --dry-run
+./install-codex.sh --github-plugin github@openai-curated-remote --hugging-face-plugin huggingface@openai-curated-remote --dry-run
 ```
 
-確認預覽後，才由你決定是否把 `--dry-run` 改成 `--apply`，並保留相同 profile、來源與其他旗標。`--github-plugin` 也可傳給 `install-all.sh`，只影響 Codex 階段。
+確認預覽後，可把 `--dry-run` 改成 `--apply`，並保留相同 profile、來源與其他旗標。未指定 IDs 時直接執行 `./install-codex.sh --dry-run` 即可使用上述選擇規則。`--github-plugin`、`--hugging-face-plugin` 與 `--skip-hugging-face` 也可傳給 `install-all.sh`，只影響 Codex 階段，Claude 階段接受但不使用它們；同時指定 Hugging Face ID 與略過旗標時，以略過為優先。
 
 `i-have-adhd` 則由固定 SHA 的本機 checkout 提供。已有來源時先驗證其 marketplace、plugin manifest 與 skill；首次取得來源後會在安裝 skills 前驗證，再按計畫註冊 marketplace。因此新設備不必事先已有 `i-have-adhd` marketplace；dry-run 若尚無來源，會把本機來源驗證留到 apply 取得來源後。
 
@@ -309,7 +314,7 @@ codex plugin list
 codex plugin marketplace list
 ```
 
-預期有 `github@openai-curated`、`hugging-face@openai-curated` 與 `i-have-adhd@i-have-adhd`；使用 `--github-plugin` 時第一項改為你選定的完整 ID，使用 `--skip-hugging-face` 時不要求第二項。對需要帳號的 connector，仍須在新設備重新授權；skill 檔案存在不代表服務已授權。Plugin 命令依據：[OpenAI CLI reference](https://learn.chatgpt.com/docs/cli/reference#codex-plugin)。
+預期有預檢顯示的 GitHub、Hugging Face 完整 IDs，以及 `i-have-adhd@i-have-adhd`；新版 CLI 可能沿用 `github@openai-curated-remote` 與 `huggingface@openai-curated-remote`。使用 `--skip-hugging-face` 時不要求 Hugging Face。對需要帳號的 connector，仍須在新設備重新授權；skill 檔案存在不代表服務已授權。Plugin 命令依據：[OpenAI CLI reference](https://learn.chatgpt.com/docs/cli/reference#codex-plugin)。
 
 開啟新的 Codex session，在 CLI／IDE extension 輸入 `/skills` 或 `$` 選擇技能，例如 `$deepstream-dev`、`$hallmark`。如新裝內容尚未出現，重新啟動 Codex。[OpenAI skills 說明](https://learn.chatgpt.com/docs/build-skills#how-chatgpt-and-codex-use-skills)
 
@@ -392,8 +397,9 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 | 安裝成功但 `/skills` 看不到 | 確認實際 client／profile、官方 discovery 路徑與 `SKILL.md`，參考上方相容處理並重啟 |
 | `/skills` 顯示數量與 445 不同 | 分清 portable manifest、plugins、系統技能與 client context budget；以 manifest 與逐項來源核對 |
 | Plugin marketplace 或授權失敗 | 檢查 network、帳號與 marketplace 名稱；不要把登入資料寫進 manifest，先依錯誤訊息處理 |
-| 找不到 `hugging-face@openai-curated` | 核對可用清單；需要略過時，用相同來源與 profile 加上 `--skip-hugging-face` 先預覽，再 apply，不必刪除已裝好的 skills |
-| GitHub 的 CLI 識別字與預設不同 | 從 CLI 清單核對完整 ID，用 `--github-plugin <plugin@marketplace>` 明確選擇；已安裝的確切項目會跳過，安裝器不從 cache 猜測來源 |
+| 升級 CLI 後仍報舊版 `github@openai-curated`／`hugging-face@openai-curated` 不可用 | 使用更新後的安裝器重跑 dry-run；預設會從 CLI 清單辨識表列新舊 IDs，並優先沿用已安裝項目。若曾明確指定舊 ID，移除該覆寫或改成 CLI 回報的完整 ID |
+| Hugging Face 沒有可用候選項目 | 從 CLI 清單核對完整 ID，用 `--hugging-face-plugin <plugin@marketplace>` 明確選擇；需要略過時加上 `--skip-hugging-face`，用相同來源與 profile 先預覽再 apply，不必刪除已裝好的 skills |
+| GitHub 的 CLI 識別字不在預設候選清單 | 從 CLI 清單核對完整 ID，用 `--github-plugin <github@marketplace>` 明確選擇；已安裝的確切項目會跳過，安裝器不從 cache 猜測來源 |
 | Plugin list 命令失敗或回傳無效 JSON | 確認登入、網路與 CLI 是否支援上述 JSON 查詢，處理後重跑；安裝器不把查詢錯誤當作「尚未安裝」 |
 
 ### 更新 portable 專案與上游版本

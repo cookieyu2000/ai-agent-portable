@@ -5,7 +5,8 @@ BUNDLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="dry-run"
 WITH_NVIDIA=true
 SKIP_HUGGING_FACE=false
-CODEX_GITHUB_PLUGIN="github@openai-curated"
+CODEX_GITHUB_PLUGIN=""
+CODEX_HUGGING_FACE_PLUGIN=""
 TARGET=""
 SOURCE_ROOT="${AI_AGENT_SOURCE_ROOT:-${HOME}/src/ai-agent-sources}"
 CODEX_CONFIG_ROOT="${CODEX_HOME:-${HOME}/.codex}"
@@ -17,9 +18,11 @@ CODEX_AGENT_SKILLS_PATH=""
 CODEX_ADHD_PATH=""
 
 usage() {
-    echo "Usage: $0 --target codex|claude [--dry-run|--apply] [--with-nvidia|--without-nvidia] [--skip-hugging-face] [--github-plugin ID]"
+    echo "Usage: $0 --target codex|claude [--dry-run|--apply] [--with-nvidia|--without-nvidia] [--skip-hugging-face] [--github-plugin ID] [--hugging-face-plugin ID]"
     echo "  --skip-hugging-face  Skip the Codex Hugging Face plugin; continue other plugins."
-    echo "  --github-plugin ID   Select an exact Codex GitHub plugin ID (default: github@openai-curated)."
+    echo "  --github-plugin ID   Select an exact Codex GitHub plugin ID."
+    echo "  --hugging-face-plugin ID  Select an exact Codex Hugging Face plugin ID."
+    echo "  Defaults resolve known official IDs from the CLI catalog, preferring installed plugins."
 }
 
 log() {
@@ -174,6 +177,8 @@ preflight_codex_plugins() {
     IFS=$'\t' read -r url commit destination <<<"${record}"
     CODEX_ADHD_PATH="${SOURCE_ROOT}/${destination}"
     [[ "${SKIP_HUGGING_FACE}" != true ]] || arguments+=(--skip-hugging-face)
+    [[ -z "${CODEX_GITHUB_PLUGIN}" ]] || arguments+=(--github-plugin "${CODEX_GITHUB_PLUGIN}")
+    [[ -z "${CODEX_HUGGING_FACE_PLUGIN}" ]] || arguments+=(--hugging-face-plugin "${CODEX_HUGGING_FACE_PLUGIN}")
     if prefer_nvidia i-have-adhd; then
         arguments+=(--skip-adhd)
     fi
@@ -183,17 +188,22 @@ preflight_codex_plugins() {
         fail "codex plugin marketplace list --json failed; check the CLI version, network and account, then retry. No installation was started."
     snapshot="$(printf '%s\036%s' "${plugin_snapshot}" "${marketplace_snapshot}" |
         "${PYTHON_COMMAND}" "${BUNDLE_ROOT}/scripts/codex_plugins.py" \
-        preflight --adhd-source "${CODEX_ADHD_PATH}" --github-plugin "${CODEX_GITHUB_PLUGIN}" \
+        preflight --adhd-source "${CODEX_ADHD_PATH}" \
         "${arguments[@]}")" || exit 1
     while IFS=$'\t' read -r kind identifier; do
         case "${kind}" in
             plugin) CODEX_INSTALLED_PLUGINS+=("${identifier}") ;;
             marketplace) CODEX_MARKETPLACES+=("${identifier}") ;;
+            selected-github) CODEX_GITHUB_PLUGIN="${identifier}" ;;
+            selected-hugging-face) CODEX_HUGGING_FACE_PLUGIN="${identifier}" ;;
         esac
     done <<<"${snapshot}"
     log "ok: Codex plugin preflight (${MODE})"
+    log "selected: ${CODEX_GITHUB_PLUGIN}"
     if [[ "${SKIP_HUGGING_FACE}" == true ]]; then
-        log "skip: hugging-face@openai-curated (--skip-hugging-face); other plugins remain selected"
+        log "skip: Hugging Face (--skip-hugging-face); other plugins remain selected"
+    else
+        log "selected: ${CODEX_HUGGING_FACE_PLUGIN}"
     fi
 }
 
@@ -357,7 +367,7 @@ install_codex() {
     install_bundled_skill backend-api-contracts "${CODEX_CONFIG_ROOT}"
     ensure_codex_plugin "${CODEX_GITHUB_PLUGIN}"
     if [[ "${SKIP_HUGGING_FACE}" != true ]]; then
-        ensure_codex_plugin hugging-face@openai-curated
+        ensure_codex_plugin "${CODEX_HUGGING_FACE_PLUGIN}"
     fi
     if ! skip_baseline_skill i-have-adhd; then
         ensure_codex_marketplace i-have-adhd "${CODEX_ADHD_PATH}"
@@ -416,6 +426,13 @@ while [[ $# -gt 0 ]]; do
             CODEX_GITHUB_PLUGIN="$2"
             [[ "${CODEX_GITHUB_PLUGIN}" =~ ^github@[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] ||
                 fail "--github-plugin requires an exact github@marketplace ID"
+            shift 2
+            ;;
+        --hugging-face-plugin)
+            [[ $# -ge 2 && "$2" != --* ]] || fail "--hugging-face-plugin requires a plugin@marketplace value"
+            CODEX_HUGGING_FACE_PLUGIN="$2"
+            [[ "${CODEX_HUGGING_FACE_PLUGIN}" =~ ^(hugging-face|huggingface)@[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] ||
+                fail "--hugging-face-plugin requires an exact hugging-face@marketplace or huggingface@marketplace ID"
             shift 2
             ;;
         -h|--help)

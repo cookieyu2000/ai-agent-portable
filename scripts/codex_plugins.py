@@ -10,7 +10,10 @@ import re
 import sys
 
 
-HUGGING_FACE_PLUGIN = "hugging-face@openai-curated"
+# Only catalog-confirmed IDs are candidates; do not infer aliases from caches
+# or select same-name plugins from arbitrary marketplaces.
+GITHUB_PLUGINS = ("github@openai-curated-remote", "github@openai-curated")
+HUGGING_FACE_PLUGINS = ("huggingface@openai-curated-remote", "hugging-face@openai-curated")
 ADHD_PLUGIN = "i-have-adhd@i-have-adhd"
 
 
@@ -76,7 +79,8 @@ def preflight(args: argparse.Namespace) -> None:
     snapshot = cli_json(records[0], "codex plugin list --available --json")
     installed = {entry["pluginId"] for entry in plugin_entries(snapshot, "installed")
                  if entry["installed"] is True}
-    available = {entry["pluginId"] for entry in plugin_entries(snapshot, "available")}
+    available_entries = plugin_entries(snapshot, "available")
+    available = {entry["pluginId"] for entry in available_entries}
     marketplace_snapshot = cli_json(records[1], "codex plugin marketplace list --json")
     marketplaces = marketplace_snapshot.get("marketplaces")
     if not isinstance(marketplaces, list):
@@ -86,17 +90,43 @@ def preflight(args: argparse.Namespace) -> None:
             raise ValueError("invalid Codex marketplace JSON entry")
     marketplace_names = {entry["name"] for entry in marketplaces}
 
-    if not re.fullmatch(r"github@[a-zA-Z0-9][a-zA-Z0-9._-]*", args.github_plugin):
+    if args.github_plugin is not None and not re.fullmatch(
+            r"github@[a-zA-Z0-9][a-zA-Z0-9._-]*", args.github_plugin):
         raise ValueError("--github-plugin requires an exact github@marketplace ID")
-    selected = [args.github_plugin]
+    if args.hugging_face_plugin is not None and not re.fullmatch(
+            r"(?:hugging-face|huggingface)@[a-zA-Z0-9][a-zA-Z0-9._-]*", args.hugging_face_plugin):
+        raise ValueError("--hugging-face-plugin requires an exact hugging-face@marketplace "
+                         "or huggingface@marketplace ID")
+
+    # Remote catalog entries can be installed without registering a local
+    # marketplace. Require CLI source metadata, not just a marketplace suffix.
+    installable = set()
+    for entry in available_entries:
+        source = entry.get("source")
+        remote = isinstance(source, dict) and source.get("source") == "remote"
+        if remote or entry["pluginId"].split("@")[1] in marketplace_names:
+            installable.add(entry["pluginId"])
+
+    requested = {"github": (args.github_plugin,) if args.github_plugin else GITHUB_PLUGINS}
     if not args.skip_hugging_face:
-        selected.append(HUGGING_FACE_PLUGIN)
-    missing = [plugin for plugin in selected if plugin not in installed
-               and (plugin not in available or plugin.split("@")[1] not in marketplace_names)]
+        requested["hugging-face"] = ((args.hugging_face_plugin,) if args.hugging_face_plugin
+                                    else HUGGING_FACE_PLUGINS)
+    selected = {}
+    missing = []
+    for name, candidates in requested.items():
+        # Reuse either installed version before considering a new installation.
+        # An explicit override has exactly one candidate and never falls back.
+        plugin = next((candidate for pool in (installed, installable)
+                       for candidate in candidates if candidate in pool), None)
+        if plugin is None:
+            missing.append(name)
+        else:
+            selected[name] = plugin
     if missing:
         hint = (" Hugging Face may be skipped with --skip-hugging-face."
-                if HUGGING_FACE_PLUGIN in missing else "")
-        raise ValueError("plugin unavailable: " + ", ".join(missing)
+                if "hugging-face" in missing else "")
+        expected = [" or ".join(requested[name]) for name in missing]
+        raise ValueError("plugin unavailable: " + ", ".join(expected)
                          + "; verify the exact plugin ID and marketplace using "
                          "codex plugin list --available --json and codex plugin marketplace list --json."
                          + hint + " No installation was started.")
@@ -116,6 +146,7 @@ def preflight(args: argparse.Namespace) -> None:
     # Only validated identifiers reach the shell; never evaluate CLI output as code.
     records = [f"plugin\t{plugin}\n" for plugin in sorted(installed)]
     records.extend(f"marketplace\t{name}\n" for name in sorted(marketplace_names))
+    records.extend(f"selected-{name}\t{plugin}\n" for name, plugin in selected.items())
     # Native Windows Python would otherwise translate newlines to CRLF, which
     # Bash would preserve in the identifiers it reads.
     sys.stdout.buffer.write("".join(records).encode("utf-8"))
@@ -126,7 +157,8 @@ def main() -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     check = commands.add_parser("preflight")
     check.add_argument("--skip-hugging-face", action="store_true")
-    check.add_argument("--github-plugin", default="github@openai-curated")
+    check.add_argument("--github-plugin")
+    check.add_argument("--hugging-face-plugin")
     check.add_argument("--skip-adhd", action="store_true")
     check.add_argument("--adhd-source", required=True, type=Path)
     local = commands.add_parser("validate-local")

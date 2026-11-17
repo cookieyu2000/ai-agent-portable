@@ -238,6 +238,10 @@ bash --version
 
 `--with-nvidia` 保留為相容旗標，與目前預設相同。`install-all.sh` 需要同時有 `codex` 與 `claude` CLI；只用 Codex 就使用 `install-codex.sh`。
 
+Claude 的 `agent-skills` plugin 使用 marketplace 內的完整來源複本（不含 `.git`），避免 CLI 拒絕指向 marketplace 外的 symlink。舊版安裝器建立、且仍指向固定來源的 link，會在 `--apply` 時轉成同內容複本；不同來源的 link 或內容不同的既有複本會停止。此行為已在 Claude Code `2.1.326` 驗證；路徑限制見 [Claude marketplace symlink 規則](https://code.claude.com/docs/en/plugins/host-marketplace#share-files-within-a-marketplace-with-symlinks)。
+
+安裝 Claude 後執行 `claude plugin list`，確認 `agent-skills@portable-agent-skills` 與 `i-have-adhd@i-have-adhd` 都顯示 enabled；安裝命令成功不代表 plugin 已成功載入。
+
 這三個完整入口與 `--without-nvidia` 都會自動透過共用安裝器安裝固定版本 Hallmark；不會安裝 Codync。舊環境只需補 Hallmark 時，仍可執行 `./install-optional.sh --package hallmark --target codex --dry-run`，確認後改為 `--apply`；Claude 改用 `--target claude`，兩者用 `--target both`。
 
 ### Codex plugin 預檢與選項
@@ -389,6 +393,9 @@ PYTHON_COMMAND=python ./list-skills.sh --platform codex
 | 現象 | 處理方式 |
 |---|---|
 | `codex: command not found`／沒有 `plugin` | 在當前 terminal 安裝或更新相容 Codex CLI，確認 `PATH`，再重跑 dry-run |
+| `required command not found: claude` | 先依 [Claude Code 官方指引](https://code.claude.com/docs/en/setup) 安裝 CLI，以 `claude --version` 確認後再執行本專案的 skills／plugins 安裝器 |
+| `./install-claude.sh: No such file or directory` | 先 `cd` 到本專案根目錄；`./` 代表目前目錄，也可用安裝器的絕對路徑執行 |
+| Claude plugin 顯示 `Path escapes plugin directory` | 更新本專案後，以相同 source root 重跑 Claude dry-run／apply，將舊版建立的外部來源 link 轉為 marketplace 內的複本，再以 `claude plugin list` 確認載入狀態 |
 | `python3` 找不到或版本過舊 | 安裝 Python 3.10+，或用 `PYTHON_COMMAND=python` 指向符合版本的 interpreter；Codex／Claude 的 Hallmark 安裝都需要 Python |
 | Bash arrays／`[[ -v ]]` 語法錯誤 | 使用 Bash 5；macOS 同時調整 `PATH` 讓子腳本找到新版 |
 | Windows symbolic link 權限失敗 | 確認 Developer Mode、檔案系統與 native symlink 設定；無法啟用時選 PowerShell NVIDIA-only 或 WSL |

@@ -312,10 +312,64 @@ prepare_portable_claude_marketplace() {
         run cp "${manifest_source}" "${manifest_destination}"
     fi
 
-    ensure_symlink \
-        "${agent_skills_path}" \
-        "${marketplace_root}/agent-skills"
+    ensure_claude_plugin_copy "${agent_skills_path}" "${marketplace_root}/agent-skills"
     printf -v "${output_variable}" '%s' "${marketplace_root}"
+}
+
+ensure_claude_plugin_copy() {
+    local source_path="$1"
+    local destination_path="$2"
+    local staging_path
+    local migrating_link=false
+
+    # Claude rejects plugin components resolving outside the marketplace root.
+    # Migrate only the exact source link created by older portable installers.
+    if [[ -L "${destination_path}" ]]; then
+        [[ "$(readlink "${destination_path}")" == "${source_path}" ]] ||
+            fail "existing link points elsewhere: ${destination_path}"
+        migrating_link=true
+        log "migrate: portable Claude plugin source link to a local copy: ${destination_path}"
+    elif [[ -d "${destination_path}" ]]; then
+        diff -qr -x .git "${source_path}" "${destination_path}" >/dev/null ||
+            fail "different Claude plugin copy already exists: ${destination_path}"
+        log "ok: portable Claude plugin copy already installed"
+        return
+    else
+        [[ ! -e "${destination_path}" ]] ||
+            fail "Claude plugin destination already exists: ${destination_path}"
+    fi
+
+    if [[ "${MODE}" == "dry-run" ]]; then
+        log "[dry-run] copy Claude plugin contents (excluding .git): ${source_path} -> ${destination_path}"
+        return
+    fi
+
+    # Finish copying before removing the old link; a copy failure preserves it.
+    staging_path="$(mktemp -d "$(dirname "${destination_path}")/.agent-skills.XXXXXX")"
+    if ! (
+        shopt -s dotglob nullglob
+        for entry in "${source_path}"/*; do
+            [[ "${entry##*/}" != .git ]] || continue
+            cp -R "${entry}" "${staging_path}/" || exit 1
+        done
+        diff -qr -x .git "${source_path}" "${staging_path}" >/dev/null
+    ); then
+        fail "could not stage Claude plugin copy; original destination preserved; inspect ${staging_path}"
+    fi
+    if [[ -L "${destination_path}" ]]; then
+        [[ "$(readlink "${destination_path}")" == "${source_path}" ]] ||
+            fail "Claude plugin link changed while staging: ${destination_path}"
+        rm -- "${destination_path}"
+    fi
+    [[ ! -e "${destination_path}" ]] ||
+        fail "Claude plugin destination appeared while staging: ${destination_path}"
+    if ! mv "${staging_path}" "${destination_path}"; then
+        if [[ "${migrating_link}" == true && ! -e "${destination_path}" && ! -L "${destination_path}" ]]; then
+            ln -s "${source_path}" "${destination_path}" ||
+                fail "could not restore Claude plugin source link; staged copy preserved at ${staging_path}"
+        fi
+        fail "could not install Claude plugin copy; staged copy preserved at ${staging_path}"
+    fi
 }
 
 ensure_claude_agent_skills() {

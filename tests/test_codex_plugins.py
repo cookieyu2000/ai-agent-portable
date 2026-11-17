@@ -205,6 +205,13 @@ class CodexPluginBootstrapTest(unittest.TestCase):
             (checkout / ".git").mkdir(parents=True)
             (checkout / ".git" / "HEAD").write_text(commit + "\n")
             if name == "agent-skills":
+                (checkout / ".claude-plugin").mkdir()
+                (checkout / ".claude-plugin" / "plugin.json").write_text(json.dumps({
+                    "name": name, "skills": "./skills", "commands": "./.claude/commands",
+                }))
+                (checkout / ".claude" / "commands").mkdir(parents=True)
+                (checkout / ".claude" / "commands" / "review.md").write_text("Review fixture\n")
+                (checkout / "LICENSE").write_text("MIT license fixture\n")
                 names = (REPOSITORY_ROOT / "manifests" / "agent-skills.txt").read_text().splitlines()
                 for skill in names:
                     if skill:
@@ -630,6 +637,81 @@ class CodexPluginBootstrapTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("required command not found", result.stderr)
         self.assert_no_install_changes()
+
+    def test_claude_plugin_components_stay_inside_marketplace_and_rerun_preserves_copy(self):
+        result = self.run_bootstrap("--apply", target="claude")
+        self.assert_success(result)
+        marketplace = self.sources / "claude-marketplaces" / "portable-agent-skills"
+        plugin = marketplace / "agent-skills"
+        self.assertFalse(plugin.is_symlink())
+        self.assertFalse((plugin / ".git").exists())
+        for relative in (".claude-plugin/plugin.json", ".claude/commands/review.md", "LICENSE"):
+            self.assertEqual((plugin / relative).read_bytes(), (self.sources / "agent-skills" / relative).read_bytes())
+        skills = list((plugin / "skills").glob("*/SKILL.md"))
+        self.assertEqual(len(skills), 24)
+        for skill in skills:
+            self.assertTrue(skill.resolve().is_relative_to(marketplace.resolve()))
+            self.assertEqual(skill.read_bytes(), (self.sources / "agent-skills" / skill.relative_to(plugin)).read_bytes())
+        original_stats = [(path.stat().st_ino, path.stat().st_mtime_ns) for path in skills]
+        self.assert_success(self.run_bootstrap("--apply", target="claude"))
+        self.assertEqual(original_stats, [(path.stat().st_ino, path.stat().st_mtime_ns) for path in skills])
+
+    def test_claude_migrates_only_expected_legacy_link_on_apply(self):
+        source = self.sources / "agent-skills"
+        shutil.copytree(self.fixtures / "agent-skills", source)
+        plugin = self.sources / "claude-marketplaces" / "portable-agent-skills" / "agent-skills"
+        plugin.parent.mkdir(parents=True)
+        plugin.symlink_to(source, target_is_directory=True)
+        before = (source / "skills" / "code-review-and-quality" / "SKILL.md").read_bytes()
+        self.assert_success(self.run_bootstrap("--dry-run", target="claude"))
+        self.assertTrue(plugin.is_symlink(), "dry-run migrated the source link")
+        self.assert_success(self.run_bootstrap("--apply", target="claude"))
+        self.assertFalse(plugin.is_symlink())
+        self.assertEqual(before, (plugin / "skills" / "code-review-and-quality" / "SKILL.md").read_bytes())
+        self.assertEqual(before, (source / "skills" / "code-review-and-quality" / "SKILL.md").read_bytes())
+
+    def test_claude_refuses_unrelated_plugin_link(self):
+        plugin = self.sources / "claude-marketplaces" / "portable-agent-skills" / "agent-skills"
+        plugin.parent.mkdir(parents=True)
+        other = self.root / "unrelated-plugin"
+        other.mkdir()
+        plugin.symlink_to(other, target_is_directory=True)
+        for mode in ("--dry-run", "--apply"):
+            result = self.run_bootstrap(mode, target="claude")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("existing link points elsewhere", result.stderr)
+            self.assertEqual(plugin.resolve(), other)
+
+    def test_claude_copy_failure_preserves_legacy_link(self):
+        source = self.sources / "agent-skills"
+        shutil.copytree(self.fixtures / "agent-skills", source)
+        plugin = self.sources / "claude-marketplaces" / "portable-agent-skills" / "agent-skills"
+        plugin.parent.mkdir(parents=True)
+        plugin.symlink_to(source, target_is_directory=True)
+        real_cp = shutil.which("cp")
+        fake_cp = self.bin / "cp"
+        fake_cp.write_text(
+            "#!" + sys.executable + "\nimport os, sys\n"
+            "if '/.agent-skills.' in sys.argv[-1]:\n    sys.exit(17)\n"
+            f"os.execv({real_cp!r}, [{real_cp!r}, *sys.argv[1:]])\n"
+        )
+        fake_cp.chmod(0o755)
+        result = self.run_bootstrap("--apply", target="claude")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("original destination preserved", result.stderr)
+        self.assertTrue(plugin.is_symlink())
+        self.assertEqual(plugin.resolve(), source)
+
+    def test_claude_refuses_modified_plugin_copy(self):
+        self.assert_success(self.run_bootstrap("--apply", target="claude"))
+        plugin = self.sources / "claude-marketplaces" / "portable-agent-skills" / "agent-skills"
+        skill = plugin / "skills" / "code-review-and-quality" / "SKILL.md"
+        skill.write_text("User's modified skill\n")
+        for mode in ("--dry-run", "--apply"):
+            result = self.run_bootstrap(mode, target="claude")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("different Claude plugin copy already exists", result.stderr)
+            self.assertEqual(skill.read_text(), "User's modified skill\n")
 
     def test_preflight_uses_utf8_input_and_lf_output_with_windows_text_wrappers(self):
         helper = REPOSITORY_ROOT / "scripts" / "codex_plugins.py"
